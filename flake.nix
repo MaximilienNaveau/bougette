@@ -26,6 +26,35 @@
             ${command}
             touch "$out"
           '';
+
+        # Only what Cargo needs, so editing docs doesn't rebuild the Rust.
+        rustSrc = pkgs.lib.fileset.toSource {
+          root = ./.;
+          fileset = pkgs.lib.fileset.unions [
+            ./Cargo.toml
+            ./Cargo.lock
+            ./crates
+          ];
+        };
+
+        # A Cargo command over the workspace, with the crates of Cargo.lock
+        # fetched by Nix (no network inside the build).
+        cargoCheck =
+          name: inputs: command:
+          pkgs.rustPlatform.buildRustPackage {
+            pname = "bougette-${name}";
+            version = "0.1.0";
+            src = rustSrc;
+            cargoLock.lockFile = ./Cargo.lock;
+            nativeBuildInputs = inputs;
+            buildPhase = ''
+              runHook preBuild
+              ${command}
+              runHook postBuild
+            '';
+            doCheck = false;
+            installPhase = ''touch "$out"'';
+          };
       in
       {
         # `nix develop`: the Rust toolchain from nixpkgs, pinned by
@@ -45,12 +74,19 @@
         # `nix fmt`: format the Nix files.
         formatter = pkgs.nixfmt;
 
-        # `nix flake check -L`: everything CI runs. For now, only that the
-        # Nix files are formatted; Rust format, clippy and tests come with
-        # the first crate.
+        # `nix flake check -L`: everything CI runs.
         checks = {
           nix-format = sourceCheck "nix-format" [ pkgs.nixfmt ] ''
             nixfmt --check $(find . -name '*.nix')
+          '';
+          rust-format = sourceCheck "rust-format" [ pkgs.rustfmt ] ''
+            rustfmt --check --edition 2024 $(find crates -name '*.rs')
+          '';
+          clippy = cargoCheck "clippy" [ pkgs.clippy ] ''
+            cargo clippy --offline --all-targets -- -D warnings
+          '';
+          tests = cargoCheck "tests" [ ] ''
+            cargo test --offline
           '';
         };
       }
