@@ -1,0 +1,15 @@
+[package]
+name = "bougette-core"
+description = "Bougette's domain logic: budgets, lines, schedules, money"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# Calendar dates without time or time zone (jiff::civil::Date), with
+# month arithmetic that clamps the 31st to the end of shorter months.
+# Licence: Unlicense OR MIT.
+# No default features: they bring time zones and their database, which
+# calendar dates don't need.
+jiff = { version = "0.2", default-features = false, features = ["std"] }
