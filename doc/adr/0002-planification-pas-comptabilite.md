@@ -1,0 +1,3 @@
+# Un outil de planification, pas de comptabilité, et jamais de connexion bancaire
+
+Bougette modélise des **budgets** (le prévu, comparé au réel), pas des **comptes bancaires** : pas de solde bancaire, pas de rapprochement, pas de comptabilité. Le réel entre par saisie manuelle ou par **import de fichier** (relevé CSV, OFX, CAMT.053, voire PDF avec un parseur dédié), **jamais** par une connexion directe à une banque. Les agrégateurs bancaires (DSP2/PSD2) sont propriétaires, souvent payants, et incompatibles avec F-Droid et avec une app qui ne parle qu'à des serveurs choisis par ses membres. C'est une frontière permanente, pas un « pas encore ».
