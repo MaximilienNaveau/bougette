@@ -2,11 +2,12 @@
 
 use jiff::civil::Date;
 
+use crate::id::LineId;
 use crate::money::Money;
 use crate::month::Month;
 use crate::schedule::{Period, Schedule};
 
-/// Whether a line brings money in or takes it out.
+/// Whether a line, or a transaction, brings money in or takes it out.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
     Income,
@@ -44,6 +45,7 @@ pub struct Revision {
 /// copy constructor, and `let b = a;` moves it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Line {
+    pub id: LineId,
     // `String` is an owned, growable UTF-8 string, like `std::string`.
     pub name: String,
     pub category: String,
@@ -85,6 +87,7 @@ impl Line {
             return Err(LineError::NotPositive);
         }
         Ok(Line {
+            id: LineId::new(),
             name: name.into(),
             category: category.into(),
             kind,

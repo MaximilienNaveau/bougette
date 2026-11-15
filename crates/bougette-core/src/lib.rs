@@ -11,7 +11,9 @@
 // roughly a C++ namespace + header/source pair, but with no #include: the
 // compiler finds the file from the module name.
 pub mod budget;
+pub mod id;
 pub mod line;
 pub mod money;
 pub mod month;
 pub mod schedule;
+pub mod transaction;

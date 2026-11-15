@@ -6,7 +6,7 @@
 // `use` imports names into this file, like `using std::fmt;` in C++.
 // `std::ops` holds the traits behind the operators (+, -, unary -).
 use std::fmt;
-use std::ops::{Add, Neg, Sub};
+use std::ops::{Add, AddAssign, Neg, Sub};
 
 /// A currency, by its ISO 4217 code, e.g. `EUR`.
 ///
@@ -157,6 +157,14 @@ impl Add for Money {
         // In debug builds, integer overflow panics instead of wrapping
         // silently (in C++ signed overflow is undefined behaviour).
         Money::new(self.minor_units + other.minor_units, self.currency)
+    }
+}
+
+/// `a += b`, like `operator+=`.
+impl AddAssign for Money {
+    fn add_assign(&mut self, other: Money) {
+        // `*self` is the Money behind the `&mut` reference.
+        *self = *self + other;
     }
 }
 
