@@ -324,6 +324,36 @@ impl Budget {
         totals
     }
 
+    /// The balances of every month from the budget's first one to `month`
+    /// included, added up (GLOSSARY.md: Running balance), seen from
+    /// `today`: actual for past months, forecast for the current one, plan
+    /// for the coming ones. It shows the reserve building up for a yearly
+    /// bill. Zero for an empty budget.
+    pub fn running_balance(&self, month: Month, today: Date) -> Money {
+        let mut balance = Money::zero(self.currency);
+        // `let ... else` again: an empty budget has no first month.
+        let Some(mut current) = self.first_month() else {
+            return balance;
+        };
+        while current <= month {
+            balance += self.forecast(current, today).balance();
+            current = current.next();
+        }
+        balance
+    }
+
+    /// The month of the earliest line start or transaction, if any.
+    fn first_month(&self) -> Option<Month> {
+        // Two iterators of dates chained into one, then the smallest:
+        // `min` returns None when there is no date at all.
+        self.lines
+            .iter()
+            .map(|line| line.starts_on())
+            .chain(self.transactions.iter().map(|transaction| transaction.date))
+            .min()
+            .map(Month::of)
+    }
+
     /// The transactions dated in `month` that count in the month's budget:
     /// all but the spending paid from a pot.
     // Returns "some iterator over &Transaction" without naming its exact
@@ -606,6 +636,31 @@ mod tests {
                 every(1, date(2026, 1, 5)),
             )
             .unwrap(),
+        );
+    }
+
+    #[test]
+    fn running_balance_builds_the_reserve_for_the_yearly_bill() {
+        let (budget, ..) = household();
+        // Seen from December 2025: every month of 2026 is planned.
+        let today = date(2025, 12, 1);
+        let running = |m| budget.running_balance(month(2026, m), today);
+        // January: 2,500 in, rent 900 + electricity 120 + groceries 600.
+        assert_eq!(running(1), eur(250000 - 162000));
+        // February: no electricity bill, so more is set aside.
+        assert_eq!(running(2), eur(88000 + 100000));
+        // March: insurance and electricity are paid from what built up.
+        assert_eq!(running(3), eur(188000 + 250000 - 210000));
+        // Over a full year, the smoothed surplus: 12 × 900 = 10,800.
+        assert_eq!(running(12), eur(12 * 90000));
+    }
+
+    #[test]
+    fn running_balance_of_an_empty_budget_is_zero() {
+        let budget = Budget::new("Empty", Currency::EUR);
+        assert_eq!(
+            budget.running_balance(month(2026, 5), date(2026, 5, 1)),
+            eur(0)
         );
     }
 

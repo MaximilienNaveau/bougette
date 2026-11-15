@@ -1,6 +1,8 @@
 //! A calendar month, from the 1st to its last day: the unit of every
 //! budget view (doc/scope.md: a month always starts on the 1st).
 
+// `ToSpan` adds `.month()` and friends to integers.
+use jiff::ToSpan;
 // `jiff::civil::Date` is a calendar date with no time and no time zone.
 use jiff::civil::Date;
 
@@ -49,6 +51,17 @@ impl Month {
         Month::of(date) == *self // `*self` dereferences `&Month` to compare values
     }
 
+    /// The month after this one.
+    pub fn next(&self) -> Month {
+        // `1.month()` is a Span of one month (from jiff's ToSpan trait).
+        // Adding it to the 1st can't clamp, and only fails beyond year 9999.
+        let first_day = self
+            .first_day
+            .checked_add(1.month())
+            .expect("date in range");
+        Month { first_day }
+    }
+
     /// The number of months from `self` to `later`, negative if `later` is
     /// before `self`. From January to March 2026 is 2.
     pub fn months_until(&self, later: Month) -> i32 {
@@ -81,5 +94,9 @@ mod tests {
         let november = Month::new(2026, 11).unwrap();
         assert_eq!(november.months_until(Month::new(2027, 2).unwrap()), 3);
         assert_eq!(november.months_until(Month::new(2026, 8).unwrap()), -3);
+        assert_eq!(
+            Month::new(2026, 12).unwrap().next(),
+            Month::new(2027, 1).unwrap()
+        );
     }
 }
