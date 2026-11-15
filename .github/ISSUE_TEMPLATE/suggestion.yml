@@ -1,0 +1,22 @@
+name: Suggestion
+description: An idea to make the app more useful.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What are you trying to do?
+      description: |
+        Describe your situation and need, not only the solution: e.g. "we
+        split the rent 60/40 and I want each share to land in our own
+        budgets".
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help?
+  - type: textarea
+    id: today
+    attributes:
+      label: How do you handle it today?
