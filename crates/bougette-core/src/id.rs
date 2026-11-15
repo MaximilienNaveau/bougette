@@ -45,6 +45,10 @@ macro_rules! id_type {
 
 // Each call expands to a full type definition, as if written out here.
 id_type!(
+    /// The identifier of a budget.
+    BudgetId
+);
+id_type!(
     /// The identifier of a line.
     LineId
 );

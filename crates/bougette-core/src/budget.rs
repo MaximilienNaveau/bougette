@@ -2,7 +2,7 @@
 
 use jiff::civil::Date;
 
-use crate::id::{LineId, PotId, TransactionId};
+use crate::id::{BudgetId, LineId, PotId, TransactionId};
 use crate::line::{Kind, Line, View};
 use crate::money::{Currency, Money};
 use crate::month::Month;
@@ -13,6 +13,7 @@ use crate::transaction::{PotMove, Transaction};
 /// (the actual) and its pots.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Budget {
+    pub id: BudgetId,
     pub name: String,
     // Private: fixed when the budget is created (doc/scope.md).
     currency: Currency,
@@ -115,6 +116,7 @@ impl Budget {
     /// An empty budget in `currency`.
     pub fn new(name: impl Into<String>, currency: Currency) -> Budget {
         Budget {
+            id: BudgetId::new(),
             name: name.into(),
             currency,
             lines: Vec::new(),
