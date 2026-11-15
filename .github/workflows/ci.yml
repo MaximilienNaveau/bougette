@@ -1,0 +1,24 @@
+name: CI
+
+# Everything is built by the repository's flake, with the same command as
+# locally: `nix flake check -L`.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_call:
+
+jobs:
+  check:
+    name: nix flake check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Run every check of the flake
+        run: nix flake check -L

@@ -1,0 +1,12 @@
+# Rust build output (the equivalent of a CMake build/ directory).
+target/
+
+# `nix build` results.
+result
+result-*
+
+# direnv's cache, if you use `use flake` in an .envrc.
+.direnv/
+
+# Local Claude Code settings: per-machine permission allowlists.
+.claude/
