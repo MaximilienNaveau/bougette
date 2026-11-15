@@ -35,7 +35,7 @@ Décisions de périmètre prises pendant la séance de cadrage des 14 et 15 nove
 - **Modifications concurrentes** : la plus récente gagne, champ par champ. Quand un montant est écrasé, l'app le signale par une notification interne (cloche avec pastille ou compteur, et historique des notifications).
 - **Corbeille** par budget : lignes et opérations supprimées restaurables pendant 30 jours par un Éditeur.
 - **Remboursements** : opération négative dans une catégorie de dépense.
-- **Couleurs prévu/réel**, par poste et dans le calendrier :
+- **Couleurs prévu/réel**, par poste et dans le calendrier, pour les dépenses seulement (pas de couleur sur les revenus en v1) :
   - vert : sous le prévu ;
   - jaune ou orange : proche du prévu (au moins 90 %, seuil fixe en v1) ;
   - rouge : dépassement, avec le montant réel affiché.
