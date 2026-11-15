@@ -10,6 +10,8 @@
 // visible to users of the crate. A module is a namespace *and* a file,
 // roughly a C++ namespace + header/source pair, but with no #include: the
 // compiler finds the file from the module name.
+pub mod budget;
+pub mod line;
 pub mod money;
 pub mod month;
 pub mod schedule;

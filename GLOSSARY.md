@@ -58,6 +58,10 @@ _Avoid_: Tag, type, group
 A planned, recurring income or cost of a budget, e.g. electricity, rent or a salary, with a category, an amount, a schedule and the dates it is valid between. (fr: poste)
 _Avoid_: Item, entry, expense (an expense is something that actually happened)
 
+**Revision**:
+A line's amount and schedule from a given date on, until the next revision. Changing a line from a date adds a revision; the months before keep the old one. (fr: révision)
+_Avoid_: Version, change, update
+
 **Schedule**:
 When a line's amount is due: monthly on a given day, every N months, yearly on a date, weekly, or once (one-off). E.g. €120 every two months on the 5th, or €480 every March. (fr: échéancier)
 _Avoid_: Recurrence, frequency (only one part of it)
