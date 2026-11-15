@@ -2,7 +2,7 @@
 
 use jiff::civil::Date;
 
-use crate::id::LineId;
+use crate::id::{LineId, PotId};
 use crate::money::Money;
 use crate::month::Month;
 use crate::schedule::{Period, Schedule};
@@ -50,6 +50,8 @@ pub struct Line {
     pub name: String,
     pub category: String,
     pub kind: Kind,
+    /// For an allocation, the pot it feeds (GLOSSARY.md: Allocation).
+    pub pot: Option<PotId>,
     // Private: `change_from` keeps them sorted by date, and there is always
     // at least one.
     revisions: Vec<Revision>,
@@ -91,6 +93,7 @@ impl Line {
             name: name.into(),
             category: category.into(),
             kind,
+            pot: None,
             revisions: vec![Revision {
                 from,
                 amount,

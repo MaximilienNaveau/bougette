@@ -2,7 +2,7 @@
 
 use jiff::civil::Date;
 
-use crate::id::{LineId, TransactionId};
+use crate::id::{LineId, PotId, TransactionId};
 use crate::line::Kind;
 use crate::money::Money;
 
@@ -20,12 +20,25 @@ pub struct Transaction {
     pub category: String,
     /// Optional: the line this transaction realises, if it was planned.
     pub line: Option<LineId>,
+    /// Optional: the pot this transaction puts money into or is paid from.
+    pub pot: Option<PotMove>,
     /// Free text, e.g. "Engie, November".
     pub note: String,
 }
 
+/// How a transaction moves money for a pot. Both are costs of the budget.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PotMove {
+    /// An allocation: the money leaves the month's budget for the pot
+    /// (GLOSSARY.md: Allocation). It counts as a cost of the month.
+    Into(PotId),
+    /// Spending paid from the pot, e.g. buying the bike: it lowers the
+    /// pot's balance and does not count against the month's plan.
+    PaidFrom(PotId),
+}
+
 impl Transaction {
-    /// A new transaction with a fresh identifier and no note.
+    /// A new transaction with a fresh identifier, no pot and no note.
     pub fn new(
         date: Date,
         kind: Kind,
@@ -40,6 +53,7 @@ impl Transaction {
             amount,
             category: category.into(),
             line,
+            pot: None,
             // `String::new()` is an empty string.
             note: String::new(),
         }

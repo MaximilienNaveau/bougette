@@ -2,22 +2,25 @@
 
 use jiff::civil::Date;
 
-use crate::id::{LineId, TransactionId};
+use crate::id::{LineId, PotId, TransactionId};
 use crate::line::{Kind, Line, View};
 use crate::money::{Currency, Money};
 use crate::month::Month;
-use crate::transaction::Transaction;
+use crate::pot::Pot;
+use crate::transaction::{PotMove, Transaction};
 
-/// A budget (GLOSSARY.md: Budget): its lines (the plan) and its
-/// transactions (the actual).
+/// A budget (GLOSSARY.md: Budget): its lines (the plan), its transactions
+/// (the actual) and its pots.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Budget {
     pub name: String,
     // Private: fixed when the budget is created (doc/scope.md).
     currency: Currency,
-    // Private: `add_line` and `add_transaction` check what goes in.
+    // Private: `add_line`, `add_transaction` and `add_pot` check what goes
+    // in.
     lines: Vec<Line>,
     transactions: Vec<Transaction>,
+    pots: Vec<Pot>,
 }
 
 /// What comes in and what goes out over a month, both counted positive.
@@ -91,15 +94,21 @@ impl Comparison {
     }
 }
 
-/// Why a transaction was refused.
+/// Why a line or a transaction was refused.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BudgetError {
     /// The amount isn't in the budget's currency.
     WrongCurrency,
     /// The transaction points to a line this budget doesn't have.
     UnknownLine,
+    /// The line or transaction points to a pot this budget doesn't have.
+    UnknownPot,
     /// An income transaction on a cost line, or the reverse.
     KindMismatch,
+    /// Money moves into or out of a pot through costs only.
+    PotNeedsACost,
+    /// A transaction on an allocation line doesn't feed that line's pot.
+    PotMismatch,
 }
 
 impl Budget {
@@ -110,6 +119,7 @@ impl Budget {
             currency,
             lines: Vec::new(),
             transactions: Vec::new(),
+            pots: Vec::new(),
         }
     }
 
@@ -130,24 +140,52 @@ impl Budget {
         self.lines.iter().find(|line| line.id == id)
     }
 
-    /// Adds a line and returns its identifier. Panics if its amounts aren't
-    /// in the budget's currency: callers build amounts from `currency()`,
-    /// so that would be a bug.
-    pub fn add_line(&mut self, line: Line) -> LineId {
+    pub fn pots(&self) -> &[Pot] {
+        &self.pots
+    }
+
+    /// The pot with this identifier, if the budget has it.
+    pub fn pot(&self, id: PotId) -> Option<&Pot> {
+        self.pots.iter().find(|pot| pot.id == id)
+    }
+
+    /// Adds a pot and returns its identifier.
+    pub fn add_pot(&mut self, pot: Pot) -> PotId {
+        let id = pot.id;
+        self.pots.push(pot);
+        id
+    }
+
+    /// Adds a line and returns its identifier. An allocation (a line with a
+    /// pot) must be a cost and feed a pot of this budget.
+    ///
+    /// Panics if the line's amounts aren't in the budget's currency:
+    /// callers build amounts from `currency()`, so that would be a bug.
+    pub fn add_line(&mut self, line: Line) -> Result<LineId, BudgetError> {
         assert!(
             line.revisions()
                 .iter()
                 .all(|revision| revision.amount.currency() == self.currency),
             "line in another currency than its budget"
         );
+        if let Some(pot) = line.pot {
+            if line.kind != Kind::Cost {
+                return Err(BudgetError::PotNeedsACost);
+            }
+            // `ok_or` turns an Option into a Result: `None` becomes the
+            // given error. The `?` operator then returns that error from
+            // the function, or unwraps the `Ok` value. It replaces the
+            // "check and return early" boilerplate that exceptions hide.
+            self.pot(pot).ok_or(BudgetError::UnknownPot)?;
+        }
         let id = line.id;
         // `push` takes the line by value: it is *moved* into the Vec, and
         // the caller can no longer use it (the compiler enforces it).
         self.lines.push(line);
-        id
+        Ok(id)
     }
 
-    /// Adds a transaction after checking its currency and its line.
+    /// Adds a transaction after checking its currency, its line and its pot.
     pub fn add_transaction(
         &mut self,
         transaction: Transaction,
@@ -156,18 +194,48 @@ impl Budget {
             return Err(BudgetError::WrongCurrency);
         }
         if let Some(line_id) = transaction.line {
-            // `ok_or` turns an Option into a Result: `None` becomes the
-            // given error. The `?` operator then returns that error from
-            // the function, or unwraps the `Ok` value. It replaces the
-            // "check and return early" boilerplate that exceptions hide.
             let line = self.line(line_id).ok_or(BudgetError::UnknownLine)?;
             if line.kind != transaction.kind {
                 return Err(BudgetError::KindMismatch);
             }
+            // A transaction on an allocation line puts money in its pot.
+            if let Some(pot) = line.pot
+                && transaction.pot != Some(PotMove::Into(pot))
+            {
+                return Err(BudgetError::PotMismatch);
+            }
+        }
+        if let Some(PotMove::Into(pot) | PotMove::PaidFrom(pot)) = transaction.pot {
+            // `A(x) | B(x)` matches either variant and binds `x` in both.
+            if transaction.kind != Kind::Cost {
+                return Err(BudgetError::PotNeedsACost);
+            }
+            self.pot(pot).ok_or(BudgetError::UnknownPot)?;
         }
         let id = transaction.id;
         self.transactions.push(transaction);
         Ok(id)
+    }
+
+    /// What pot `id` holds at the end of `date`: what was allocated to it
+    /// minus what was paid from it. Negative when overspent, which is
+    /// allowed (doc/scope.md). `None` for an unknown pot.
+    pub fn pot_balance(&self, id: PotId, date: Date) -> Option<Money> {
+        self.pot(id)?;
+        let mut balance = Money::zero(self.currency);
+        for transaction in &self.transactions {
+            if transaction.date > date {
+                continue;
+            }
+            match transaction.pot {
+                Some(PotMove::Into(pot)) if pot == id => balance += transaction.amount,
+                // `if` after a pattern is a "match guard": an extra test.
+                Some(PotMove::PaidFrom(pot)) if pot == id => balance = balance - transaction.amount,
+                // `_` matches everything else: other pots, or no pot.
+                _ => {}
+            }
+        }
+        Some(balance)
     }
 
     /// The plan of `month`: total incomes and total costs of the lines.
@@ -256,16 +324,19 @@ impl Budget {
         totals
     }
 
-    /// The transactions dated in `month`.
+    /// The transactions dated in `month` that count in the month's budget:
+    /// all but the spending paid from a pot.
     // Returns "some iterator over &Transaction" without naming its exact
     // (long, compiler-generated) type, like returning `auto` in C++. The
     // `'_` says the iterator borrows from `self`: it can't outlive the
     // budget. That's a *lifetime*, a compile-time check that references
     // never dangle; C++ has no equivalent.
     fn transactions_in(&self, month: Month) -> impl Iterator<Item = &Transaction> + '_ {
-        self.transactions
-            .iter()
-            .filter(move |transaction| month.contains(transaction.date))
+        self.transactions.iter().filter(move |transaction| {
+            // `matches!` is true if the value fits the pattern.
+            month.contains(transaction.date)
+                && !matches!(transaction.pot, Some(PotMove::PaidFrom(_)))
+        })
     }
 
     /// The total of the transactions realising line `id` in `month`.
@@ -300,6 +371,11 @@ mod tests {
         }
     }
 
+    /// Adds a line that must be accepted.
+    fn add(budget: &mut Budget, line: Line) -> LineId {
+        budget.add_line(line).unwrap()
+    }
+
     /// The household of GLOSSARY.md: €2,500 of contributions a month, rent,
     /// electricity every two months, a yearly insurance and groceries. The
     /// identifiers of the rent and groceries lines come back with it, in a
@@ -311,41 +387,56 @@ mod tests {
         let line = |name, category, kind, cents, schedule| {
             Line::new(name, category, kind, start, eur(cents), schedule).unwrap()
         };
-        budget.add_line(line(
-            "Contributions",
-            "Contributions",
-            Kind::Income,
-            250000,
-            every(1, date(2026, 1, 1)),
-        ));
-        let rent = budget.add_line(line(
-            "Rent",
-            "Housing",
-            Kind::Cost,
-            90000,
-            every(1, date(2026, 1, 5)),
-        ));
-        budget.add_line(line(
-            "Electricity",
-            "Energy",
-            Kind::Cost,
-            12000,
-            every(2, date(2026, 1, 15)),
-        ));
-        budget.add_line(line(
-            "Home insurance",
-            "Housing",
-            Kind::Cost,
-            48000,
-            every(12, date(2026, 3, 10)),
-        ));
-        let groceries = budget.add_line(line(
-            "Groceries",
-            "Food",
-            Kind::Cost,
-            60000,
-            every(1, date(2026, 1, 1)),
-        ));
+        add(
+            &mut budget,
+            line(
+                "Contributions",
+                "Contributions",
+                Kind::Income,
+                250000,
+                every(1, date(2026, 1, 1)),
+            ),
+        );
+        let rent = add(
+            &mut budget,
+            line(
+                "Rent",
+                "Housing",
+                Kind::Cost,
+                90000,
+                every(1, date(2026, 1, 5)),
+            ),
+        );
+        add(
+            &mut budget,
+            line(
+                "Electricity",
+                "Energy",
+                Kind::Cost,
+                12000,
+                every(2, date(2026, 1, 15)),
+            ),
+        );
+        add(
+            &mut budget,
+            line(
+                "Home insurance",
+                "Housing",
+                Kind::Cost,
+                48000,
+                every(12, date(2026, 3, 10)),
+            ),
+        );
+        let groceries = add(
+            &mut budget,
+            line(
+                "Groceries",
+                "Food",
+                Kind::Cost,
+                60000,
+                every(1, date(2026, 1, 1)),
+            ),
+        );
         (budget, rent, groceries)
     }
 
@@ -504,7 +595,8 @@ mod tests {
     fn refuses_lines_in_another_currency() {
         let chf = Currency::from_code("CHF").unwrap();
         let mut budget = Budget::new("Household", Currency::EUR);
-        budget.add_line(
+        // `let _ =` drops the Result on purpose: we expect a panic before.
+        let _ = budget.add_line(
             Line::new(
                 "Rent",
                 "Housing",
@@ -514,6 +606,91 @@ mod tests {
                 every(1, date(2026, 1, 5)),
             )
             .unwrap(),
+        );
+    }
+
+    /// The household with a "Bike" pot fed €100 a month from January, and
+    /// the allocation transactions of January to April.
+    fn with_bike_pot() -> (Budget, PotId) {
+        let (mut budget, ..) = household();
+        let bike = budget.add_pot(Pot::new("Bike"));
+        let mut allocation = Line::new(
+            "Bike savings",
+            "Savings",
+            Kind::Cost,
+            date(2026, 1, 1),
+            eur(10000),
+            every(1, date(2026, 1, 1)),
+        )
+        .unwrap();
+        allocation.pot = Some(bike);
+        let allocation = add(&mut budget, allocation);
+        for m in 1..=4 {
+            let mut transaction = cost(date(2026, m, 1), 10000, "Savings", Some(allocation));
+            transaction.pot = Some(PotMove::Into(bike));
+            budget.add_transaction(transaction).unwrap();
+        }
+        (budget, bike)
+    }
+
+    #[test]
+    fn allocations_fill_the_pot_and_cost_the_month() {
+        let (budget, bike) = with_bike_pot();
+        assert_eq!(
+            budget.pot_balance(bike, date(2026, 4, 30)),
+            Some(eur(40000))
+        );
+        assert_eq!(
+            budget.pot_balance(bike, date(2026, 2, 15)),
+            Some(eur(20000))
+        );
+        // The allocation is a cost of the month, planned and actual.
+        assert_eq!(budget.actual(month(2026, 4)).costs, eur(10000));
+        let plan = budget.plan(month(2026, 4), View::Smoothed);
+        assert_eq!(plan.costs, eur(160000 + 10000));
+    }
+
+    #[test]
+    fn spending_from_a_pot_is_not_a_cost_of_the_month() {
+        let (mut budget, bike) = with_bike_pot();
+        // The bike costs more than the pot holds: allowed, and visible.
+        let mut purchase = cost(date(2026, 4, 20), 45000, "Transport", None);
+        purchase.pot = Some(PotMove::PaidFrom(bike));
+        budget.add_transaction(purchase).unwrap();
+        assert_eq!(
+            budget.pot_balance(bike, date(2026, 4, 30)),
+            Some(eur(-5000))
+        );
+        // April's actual only has the allocation, not the bike.
+        assert_eq!(budget.actual(month(2026, 4)).costs, eur(10000));
+        let transport = budget.compare_category(Kind::Cost, "Transport", month(2026, 4));
+        assert_eq!(transport.actual, eur(0));
+    }
+
+    #[test]
+    fn refuses_inconsistent_pot_moves() {
+        let (mut budget, bike) = with_bike_pot();
+        // An unknown pot.
+        let mut unknown = cost(date(2026, 5, 1), 100, "Savings", None);
+        unknown.pot = Some(PotMove::Into(PotId::new()));
+        assert_eq!(
+            budget.add_transaction(unknown),
+            Err(BudgetError::UnknownPot)
+        );
+        // An income can't go into a pot.
+        let mut income =
+            Transaction::new(date(2026, 5, 1), Kind::Income, eur(100), "Savings", None);
+        income.pot = Some(PotMove::Into(bike));
+        assert_eq!(
+            budget.add_transaction(income),
+            Err(BudgetError::PotNeedsACost)
+        );
+        // A transaction on the allocation line must feed its pot.
+        let allocation = budget.lines().iter().find(|l| l.pot.is_some()).unwrap().id;
+        let missing = cost(date(2026, 5, 1), 10000, "Savings", Some(allocation));
+        assert_eq!(
+            budget.add_transaction(missing),
+            Err(BudgetError::PotMismatch)
         );
     }
 }

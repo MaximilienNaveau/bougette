@@ -15,5 +15,6 @@ pub mod id;
 pub mod line;
 pub mod money;
 pub mod month;
+pub mod pot;
 pub mod schedule;
 pub mod transaction;
