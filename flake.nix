@@ -49,6 +49,10 @@
             nativeBuildInputs = inputs;
             buildPhase = ''
               runHook preBuild
+              # nixpkgs sets this to 1, which makes rusqlite link the
+              # system SQLite: build SQLite from its bundled source instead,
+              # as everywhere else (F-Droid, Android, Windows).
+              export LIBSQLITE3_SYS_USE_PKG_CONFIG=0
               ${command}
               runHook postBuild
             '';
