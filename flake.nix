@@ -1,6 +1,17 @@
 {
   description = "Bougette: local-first app for individual and shared budgets";
 
+  # CI pushes what it builds (dependencies, checks, binaries) to this
+  # binary cache, so a machine that trusts it downloads them instead of
+  # rebuilding. (Nix asks before using a flake's cache;
+  # `--accept-flake-config` says yes.)
+  nixConfig = {
+    extra-substituters = [ "https://baxter.cachix.org" ];
+    extra-trusted-public-keys = [
+      "baxter.cachix.org-1:BJW9FafkmcXVDJVK2xL/b0J3bQkn+wdJPNgmHDRfzoQ="
+    ];
+  };
+
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";

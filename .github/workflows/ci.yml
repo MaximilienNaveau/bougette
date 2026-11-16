@@ -20,5 +20,16 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@main
 
+      # Pulls from the baxter cache (shared with the trampoline game), and
+      # pushes what this job builds to it (only when the CACHIX_AUTH_TOKEN
+      # secret is there: not on forks' PRs). The cache is public: once the
+      # Android SDK comes in, it must be kept out with a `pushFilter`
+      # (unfree, Google's licence forbids redistributing it).
+      - name: Use the baxter Cachix cache
+        uses: cachix/cachix-action@v17
+        with:
+          name: baxter
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
       - name: Run every check of the flake
         run: nix flake check -L
