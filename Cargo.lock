@@ -203,6 +203,7 @@ dependencies = [
  "bougette-core",
  "bougette-store",
  "bougette-sync",
+ "iroh",
  "jiff",
  "tokio",
 ]
@@ -221,6 +222,8 @@ version = "0.1.0"
 dependencies = [
  "bougette-store",
  "bougette-sync",
+ "iroh",
+ "rusqlite",
  "tokio",
 ]
 

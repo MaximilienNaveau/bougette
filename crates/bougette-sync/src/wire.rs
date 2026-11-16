@@ -1,13 +1,13 @@
-//! How version vectors and messages travel as bytes. Plain and explicit,
-//! with no serialization crate:
-//! - a number: 4 bytes, big-endian (`u32`);
-//! - a text: its length in bytes (a number), then its UTF-8 bytes;
-//! - an optional text: one byte, 0 for none, or 1 followed by the text;
+//! How version vectors, messages and requests travel as bytes. Plain and
+//! explicit, with no serialization crate:
+//! - a number: 4 bytes, big-endian (`u32`), or 8 for a time (`u64`);
+//! - a byte string or text: its length (a number), then its bytes;
+//! - an optional number: one byte, 0 for none, or 1 followed by it;
 //! - a list: its length (a number), then its items.
 //!
-//! A version vector is a list of (device, timestamp) pairs; a message is
-//! its timestamp, budget, entity, id and field (texts), then its value (an
-//! optional text).
+//! A version vector is a list of (budget, device, timestamp); a message is
+//! its timestamp, budget and author (texts), key number (optional), body
+//! and signature (byte strings).
 
 use bougette_store::{Message, Versions};
 // The `...Ext` traits add helper methods (`read_u32`, `write_all`...) to
@@ -17,16 +17,17 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use crate::SyncError;
 
-/// The longest text accepted, so a broken peer can't make us allocate
-/// gigabytes. Fields are short: names, notes, identifiers.
-const MAX_TEXT: u32 = 1 << 20;
+/// The longest byte string accepted, so a broken peer can't make us
+/// allocate gigabytes. Fields are short; a backup is a few kilobytes.
+const MAX_BYTES: u32 = 1 << 20;
 
 pub async fn write_versions<W: AsyncWrite + Unpin>(
     writer: &mut W,
     versions: &Versions,
 ) -> Result<(), SyncError> {
     write_length(writer, versions.len()).await?;
-    for (node, timestamp) in versions {
+    for ((budget, node), timestamp) in versions {
+        write_text(writer, budget).await?;
         write_text(writer, node).await?;
         write_text(writer, timestamp).await?;
     }
@@ -37,9 +38,10 @@ pub async fn read_versions<R: AsyncRead + Unpin>(reader: &mut R) -> Result<Versi
     let count = reader.read_u32().await?;
     let mut versions = Versions::new();
     for _ in 0..count {
+        let budget = read_text(reader).await?;
         let node = read_text(reader).await?;
         let timestamp = read_text(reader).await?;
-        versions.insert(node, timestamp);
+        versions.insert((budget, node), timestamp);
     }
     Ok(versions)
 }
@@ -50,22 +52,19 @@ pub async fn write_messages<W: AsyncWrite + Unpin>(
 ) -> Result<(), SyncError> {
     write_length(writer, messages.len()).await?;
     for message in messages {
-        for text in [
-            &message.timestamp,
-            &message.budget,
-            &message.entity,
-            &message.id,
-            &message.field,
-        ] {
-            write_text(writer, text).await?;
-        }
-        match &message.value {
+        write_text(writer, &message.timestamp).await?;
+        write_text(writer, &message.budget).await?;
+        write_text(writer, &message.author).await?;
+        let (key, body) = message.stored_body();
+        match key {
             None => writer.write_u8(0).await?,
-            Some(value) => {
+            Some(key) => {
                 writer.write_u8(1).await?;
-                write_text(writer, value).await?;
+                writer.write_u32(key).await?;
             }
         }
+        write_bytes(writer, &body).await?;
+        write_bytes(writer, &message.signature).await?;
     }
     Ok(())
 }
@@ -78,26 +77,29 @@ pub async fn read_messages<R: AsyncRead + Unpin>(
     // memory should only grow with what actually arrives.
     let mut messages = Vec::new();
     for _ in 0..count {
+        let timestamp = read_text(reader).await?;
+        let budget = read_text(reader).await?;
+        let author = read_text(reader).await?;
+        let key = match reader.read_u8().await? {
+            0 => None,
+            1 => Some(reader.read_u32().await?),
+            other => return Err(SyncError::Protocol(format!("bad option tag {other}"))),
+        };
+        let body = Message::body_from(key, read_bytes(reader).await?)
+            .ok_or_else(|| SyncError::Protocol("bad message body".to_string()))?;
         messages.push(Message {
-            timestamp: read_text(reader).await?,
-            budget: read_text(reader).await?,
-            entity: read_text(reader).await?,
-            id: read_text(reader).await?,
-            field: read_text(reader).await?,
-            value: match reader.read_u8().await? {
-                0 => None,
-                1 => Some(read_text(reader).await?),
-                other => {
-                    return Err(SyncError::Protocol(format!("bad option tag {other}")));
-                }
-            },
+            timestamp,
+            budget,
+            author,
+            body,
+            signature: read_bytes(reader).await?,
         });
     }
     Ok(messages)
 }
 
 /// A length as a 4-byte number; more than 4 billion items is a bug.
-async fn write_length<W: AsyncWrite + Unpin>(
+pub async fn write_length<W: AsyncWrite + Unpin>(
     writer: &mut W,
     length: usize,
 ) -> Result<(), SyncError> {
@@ -106,19 +108,34 @@ async fn write_length<W: AsyncWrite + Unpin>(
     Ok(())
 }
 
-async fn write_text<W: AsyncWrite + Unpin>(writer: &mut W, text: &str) -> Result<(), SyncError> {
-    write_length(writer, text.len()).await?;
-    writer.write_all(text.as_bytes()).await?;
+pub async fn write_bytes<W: AsyncWrite + Unpin>(
+    writer: &mut W,
+    bytes: &[u8],
+) -> Result<(), SyncError> {
+    write_length(writer, bytes.len()).await?;
+    writer.write_all(bytes).await?;
     Ok(())
 }
 
-async fn read_text<R: AsyncRead + Unpin>(reader: &mut R) -> Result<String, SyncError> {
+pub async fn read_bytes<R: AsyncRead + Unpin>(reader: &mut R) -> Result<Vec<u8>, SyncError> {
     let length = reader.read_u32().await?;
-    if length > MAX_TEXT {
-        return Err(SyncError::Protocol(format!("text of {length} bytes")));
+    if length > MAX_BYTES {
+        return Err(SyncError::Protocol(format!("{length} bytes at once")));
     }
     // `vec![0; n]`: n zero bytes, filled by `read_exact`.
     let mut bytes = vec![0; length as usize];
     reader.read_exact(&mut bytes).await?;
-    String::from_utf8(bytes).map_err(|_| SyncError::Protocol("text is not UTF-8".to_string()))
+    Ok(bytes)
+}
+
+pub async fn write_text<W: AsyncWrite + Unpin>(
+    writer: &mut W,
+    text: &str,
+) -> Result<(), SyncError> {
+    write_bytes(writer, text.as_bytes()).await
+}
+
+pub async fn read_text<R: AsyncRead + Unpin>(reader: &mut R) -> Result<String, SyncError> {
+    String::from_utf8(read_bytes(reader).await?)
+        .map_err(|_| SyncError::Protocol("text is not UTF-8".to_string()))
 }
