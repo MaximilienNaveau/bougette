@@ -54,9 +54,7 @@ class _MonthScreenState extends State<MonthScreen> {
         final view = snapshot.data;
         return Scaffold(
           appBar: AppBar(
-            title: Text(
-              view == null ? widget.month : '${view.budget}, ${view.month}',
-            ),
+            title: Text('${view?.budget ?? ''} ${monthTitle(widget.month)}'),
           ),
           floatingActionButton: view == null
               ? null
@@ -65,7 +63,7 @@ class _MonthScreenState extends State<MonthScreen> {
                   children: [
                     FloatingActionButton.small(
                       heroTag: 'line',
-                      tooltip: 'Add a line',
+                      tooltip: context.words.addLine,
                       onPressed: () =>
                           _then(addLine(context, app, budget, view.pots)),
                       child: const Icon(Icons.playlist_add),
@@ -76,7 +74,7 @@ class _MonthScreenState extends State<MonthScreen> {
                       onPressed: () =>
                           _then(addTransaction(context, app, budget, view)),
                       icon: const Icon(Icons.add),
-                      label: const Text('Transaction'),
+                      label: Text(context.words.transactionButton),
                     ),
                   ],
                 ),
@@ -106,14 +104,12 @@ Future<bool> _removeTransaction(
   TransactionRow transaction,
 ) async {
   if (transaction.reflected) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('It comes from a shared budget: change it there.'),
-      ),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(context.words.changeItThere)));
     return false;
   }
-  if (!await confirm(context, 'Remove this transaction?') || !context.mounted) {
+  if (!await confirm(context, context.words.removeTransactionQuestion) ||
+      !context.mounted) {
     return false;
   }
   return guard(
@@ -146,14 +142,17 @@ class _MonthBody extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
       children: [
-        Text('Lines (${sourceLabel(view.source)})', style: heading),
+        Text(
+          context.words.linesHeading(sourceLabel(context, view.source)),
+          style: heading,
+        ),
         DataTable(
           showCheckboxColumn: false,
-          columns: const [
-            DataColumn(label: Text('Line')),
-            DataColumn(label: Text('Due'), numeric: true),
-            DataColumn(label: Text('Smoothed'), numeric: true),
-            DataColumn(label: Text('Actual'), numeric: true),
+          columns: [
+            DataColumn(label: Text(context.words.line)),
+            DataColumn(label: Text(context.words.due), numeric: true),
+            DataColumn(label: Text(context.words.smoothed), numeric: true),
+            DataColumn(label: Text(context.words.actual), numeric: true),
           ],
           rows: [
             for (final line in view.lines)
@@ -172,7 +171,7 @@ class _MonthBody extends StatelessWidget {
                         Text('${line.name} (${line.category})'),
                         if (line.endsOn != null)
                           Text(
-                            '  until ${line.endsOn}',
+                            '  ${context.words.until(dateText(line.endsOn!))}',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                       ],
@@ -185,23 +184,23 @@ class _MonthBody extends StatelessWidget {
               ),
           ],
         ),
-        const SizedBox(height: 16),
-        Text('Totals', style: heading),
+        SizedBox(height: 16),
+        Text(context.words.totals, style: heading),
         DataTable(
-          columns: const [
+          columns: [
             DataColumn(label: Text('')),
-            DataColumn(label: Text('Due'), numeric: true),
-            DataColumn(label: Text('Smoothed'), numeric: true),
-            DataColumn(label: Text('Actual'), numeric: true),
-            DataColumn(label: Text('Forecast'), numeric: true),
+            DataColumn(label: Text(context.words.due), numeric: true),
+            DataColumn(label: Text(context.words.smoothed), numeric: true),
+            DataColumn(label: Text(context.words.actual), numeric: true),
+            DataColumn(label: Text(context.words.forecast), numeric: true),
           ],
           rows: [
             // A list of records `(label, pick)`: each row's name and the
             // function picking its figure from a set of totals.
             for (final (label, pick) in <(String, int Function(Totals))>[
-              ('Incomes', (totals) => totals.incomes),
-              ('Costs', (totals) => totals.costs),
-              ('Balance', (totals) => totals.balance),
+              (context.words.incomes, (totals) => totals.incomes),
+              (context.words.costs, (totals) => totals.costs),
+              (context.words.balance, (totals) => totals.balance),
             ])
               DataRow(
                 cells: [
@@ -210,7 +209,7 @@ class _MonthBody extends StatelessWidget {
                   cell(pick(view.smoothed)),
                   cell(
                     pick(view.actual),
-                    label == 'Costs' ? view.status : Status.none,
+                    label == context.words.costs ? view.status : Status.none,
                   ),
                   cell(pick(view.forecast)),
                 ],
@@ -218,17 +217,17 @@ class _MonthBody extends StatelessWidget {
           ],
         ),
         ListTile(
-          title: const Text('Running balance at the end of the month'),
+          title: Text(context.words.runningAtEnd),
           trailing: Amount(view.running, currency),
         ),
         if (view.transactions.isNotEmpty) ...[
           const SizedBox(height: 16),
-          Text('Transactions', style: heading),
+          Text(context.words.transactions, style: heading),
           for (final transaction in view.transactions)
             ListTile(
               dense: true,
               onTap: () => onTransaction(transaction),
-              leading: Text(transaction.date),
+              leading: Text(dateText(transaction.date)),
               title: Text(
                 [
                   transaction.category,
@@ -237,7 +236,7 @@ class _MonthBody extends StatelessWidget {
                 ].join(' · '),
               ),
               subtitle: transaction.reflected
-                  ? const Text('from a shared budget')
+                  ? Text(context.words.fromShared)
                   : null,
               trailing: Amount(
                 transaction.income ? transaction.amount : -transaction.amount,
@@ -248,12 +247,12 @@ class _MonthBody extends StatelessWidget {
         const SizedBox(height: 16),
         Row(
           children: [
-            Text('Pots', style: heading),
+            Text(context.words.pots, style: heading),
             const Spacer(),
             TextButton.icon(
               onPressed: onAddPot,
               icon: const Icon(Icons.savings),
-              label: const Text('Add a pot'),
+              label: Text(context.words.addPot),
             ),
           ],
         ),

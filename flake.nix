@@ -125,6 +125,7 @@
               ./app/pubspec.yaml
               ./app/pubspec.lock
               ./app/analysis_options.yaml
+              ./app/l10n.yaml
               ./app/lib
               ./app/linux
             ];

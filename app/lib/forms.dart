@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 
+import 'look.dart';
 import 'src/rust/api.dart';
 
 /// Runs `action`, showing its error, if any, at the bottom of the screen.
@@ -45,11 +46,11 @@ Future<String?> askText(
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(context.words.cancel),
         ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(controller.text),
-          child: const Text('OK'),
+          child: Text(context.words.ok),
         ),
       ],
     ),
@@ -65,11 +66,11 @@ Future<bool> confirm(BuildContext context, String question) async {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
+          child: Text(context.words.cancel),
         ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('Yes'),
+          child: Text(context.words.yes),
         ),
       ],
     ),
@@ -104,7 +105,7 @@ Widget dateButton(
 ) {
   return TextButton.icon(
     icon: const Icon(Icons.event),
-    label: Text('$label ${day(date)}'),
+    label: Text('$label ${dateText(day(date))}'),
     onPressed: () async {
       final picked = await showDatePicker(
         context: context,
@@ -141,7 +142,7 @@ Future<bool> form(
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(context.words.cancel),
           ),
           FilledButton(
             onPressed: () async {
@@ -149,7 +150,7 @@ Future<bool> form(
                 Navigator.of(context).pop(true);
               }
             },
-            child: const Text('OK'),
+            child: Text(context.words.ok),
           ),
         ],
       ),
@@ -165,13 +166,20 @@ Widget field(TextEditingController controller, String label) => TextField(
 );
 
 /// A choice of how a line repeats.
-Widget repeatChoice(Repeat repeat, void Function(Repeat) changed) {
+Widget repeatChoice(
+  BuildContext context,
+  Repeat repeat,
+  void Function(Repeat) changed,
+) {
   return DropdownButton<Repeat>(
     value: repeat,
     isExpanded: true,
     items: [
       for (final option in Repeat.values)
-        DropdownMenuItem(value: option, child: Text(option.name)),
+        DropdownMenuItem(
+          value: option,
+          child: Text(repeatLabel(context, option)),
+        ),
     ],
     onChanged: (value) => changed(value ?? repeat),
   );
@@ -194,22 +202,22 @@ Future<bool> addLine(
   PotRow? pot;
   return form(
     context,
-    'New line',
+    context.words.newLine,
     (setState) => [
-      field(name, 'Name'),
-      field(category, 'Category'),
-      field(amount, 'Amount'),
+      field(name, context.words.name),
+      field(category, context.words.category),
+      field(amount, context.words.amount),
       SwitchListTile(
-        title: const Text('Income'),
+        title: Text(context.words.income),
         value: income,
         onChanged: pot == null
             ? (value) => setState(() => income = value)
             : null,
       ),
-      repeatChoice(repeat, (value) => setState(() => repeat = value)),
+      repeatChoice(context, repeat, (value) => setState(() => repeat = value)),
       dateButton(
         context,
-        'First due',
+        context.words.firstDue,
         first,
         (date) => setState(() => first = date),
       ),
@@ -218,11 +226,14 @@ Future<bool> addLine(
           value: pot,
           isExpanded: true,
           items: [
-            const DropdownMenuItem(value: null, child: Text('Feeds no pot')),
+            DropdownMenuItem(
+              value: null,
+              child: Text(context.words.feedsNoPot),
+            ),
             for (final option in pots)
               DropdownMenuItem(
                 value: option,
-                child: Text('Feeds ${option.name}'),
+                child: Text(context.words.feedsPot(option.name)),
               ),
           ],
           // An allocation is a cost.
@@ -267,17 +278,19 @@ Future<bool> editLine(
       children: [
         SimpleDialogOption(
           onPressed: () => Navigator.of(context).pop('change'),
-          child: const Text('Change the amount from a date…'),
+          child: Text(context.words.changeFromDate),
         ),
         SimpleDialogOption(
           onPressed: () => Navigator.of(context).pop('end'),
           child: Text(
-            line.endsOn == null ? 'End it…' : 'Ends ${line.endsOn}: change…',
+            line.endsOn == null
+                ? context.words.endIt
+                : context.words.endsChange(dateText(line.endsOn!)),
           ),
         ),
         SimpleDialogOption(
           onPressed: () => Navigator.of(context).pop('remove'),
-          child: const Text('Remove it'),
+          child: Text(context.words.removeIt),
         ),
       ],
     ),
@@ -290,17 +303,21 @@ Future<bool> editLine(
       var from = DateTime.now();
       return form(
         context,
-        'Change ${line.name}',
+        context.words.changeLine(line.name),
         (setState) => [
-          field(amount, 'Amount'),
-          repeatChoice(repeat, (value) => setState(() => repeat = value)),
+          field(amount, context.words.amount),
+          repeatChoice(
+            context,
+            repeat,
+            (value) => setState(() => repeat = value),
+          ),
           dateButton(
             context,
-            'From',
+            context.words.from,
             from,
             (date) => setState(() => from = date),
           ),
-          const Text('The months before keep the old amount.'),
+          Text(context.words.monthsBeforeKeep),
         ],
         (context) async {
           final value = cents(amount.text);
@@ -322,17 +339,17 @@ Future<bool> editLine(
       var goesOn = false;
       return form(
         context,
-        'End ${line.name}',
+        context.words.endLine(line.name),
         (setState) => [
           SwitchListTile(
-            title: const Text('Goes on'),
+            title: Text(context.words.goesOn),
             value: goesOn,
             onChanged: (value) => setState(() => goesOn = value),
           ),
           if (!goesOn)
             dateButton(
               context,
-              'Last day',
+              context.words.lastDay,
               last,
               (date) => setState(() => last = date),
             ),
@@ -347,7 +364,8 @@ Future<bool> editLine(
         ),
       );
     default:
-      if (!await confirm(context, 'Remove ${line.name}?') || !context.mounted) {
+      if (!await confirm(context, context.words.removeQuestion(line.name)) ||
+          !context.mounted) {
         return false;
       }
       return guard(
@@ -377,13 +395,13 @@ Future<bool> addTransaction(
   var date = DateTime.now();
   return form(
     context,
-    'New transaction',
+    context.words.newTransaction,
     (setState) => [
       DropdownButton<LineRow?>(
         value: line,
         isExpanded: true,
         items: [
-          const DropdownMenuItem(value: null, child: Text('Unplanned')),
+          DropdownMenuItem(value: null, child: Text(context.words.unplanned)),
           for (final option in view.lines)
             DropdownMenuItem(value: option, child: Text(option.name)),
         ],
@@ -398,11 +416,11 @@ Future<bool> addTransaction(
           }
         }),
       ),
-      field(amount, 'Amount'),
-      field(category, 'Category'),
-      field(note, 'Note'),
+      field(amount, context.words.amount),
+      field(category, context.words.category),
+      field(note, context.words.note),
       SwitchListTile(
-        title: const Text('Income'),
+        title: Text(context.words.income),
         value: income,
         onChanged: line == null && pot == null
             ? (value) => setState(() => income = value)
@@ -414,15 +432,15 @@ Future<bool> addTransaction(
           value: pot == null ? null : (pot!, fromPot),
           isExpanded: true,
           items: [
-            const DropdownMenuItem(value: null, child: Text('No pot')),
+            DropdownMenuItem(value: null, child: Text(context.words.noPot)),
             for (final option in view.pots) ...[
               DropdownMenuItem(
                 value: (option, false),
-                child: Text('Into ${option.name}'),
+                child: Text(context.words.intoPot(option.name)),
               ),
               DropdownMenuItem(
                 value: (option, true),
-                child: Text('Paid from ${option.name}'),
+                child: Text(context.words.paidFromPot(option.name)),
               ),
             ],
           ],
@@ -432,7 +450,12 @@ Future<bool> addTransaction(
             if (value != null) income = false;
           }),
         ),
-      dateButton(context, '', date, (picked) => setState(() => date = picked)),
+      dateButton(
+        context,
+        context.words.date,
+        date,
+        (picked) => setState(() => date = picked),
+      ),
     ],
     (context) async {
       final value = cents(amount.text);
@@ -464,17 +487,22 @@ Future<bool> addPot(BuildContext context, App app, String budget) {
   var by = DateTime.now();
   return form(
     context,
-    'New pot',
+    context.words.newPot,
     (setState) => [
-      field(name, 'Name'),
-      field(goal, 'Goal (optional)'),
+      field(name, context.words.name),
+      field(goal, context.words.goalOptional),
       SwitchListTile(
-        title: const Text('By a date'),
+        title: Text(context.words.byADate),
         value: hasDate,
         onChanged: (value) => setState(() => hasDate = value),
       ),
       if (hasDate)
-        dateButton(context, 'By', by, (date) => setState(() => by = date)),
+        dateButton(
+          context,
+          context.words.by,
+          by,
+          (date) => setState(() => by = date),
+        ),
     ],
     (context) => guard(
       context,

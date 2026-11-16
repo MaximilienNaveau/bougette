@@ -1,0 +1,170 @@
+{
+  "@@locale": "en",
+  "myBudgets": "My budgets",
+  "budgetButton": "Budget",
+  "newBudget": "New budget",
+  "name": "Name",
+  "noBudget": "No budget yet: add one.",
+  "monthlyAmount": "Monthly {amount}",
+  "@monthlyAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "runningAmount": "Running {amount}",
+  "@runningAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "previousYear": "Previous year",
+  "nextYear": "Next year",
+  "rename": "Rename",
+  "personalBudget": "My personal budget",
+  "sourceActual": "actual",
+  "sourceForecast": "forecast",
+  "sourcePlan": "plan",
+  "linesHeading": "Lines ({source})",
+  "@linesHeading": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "line": "Line",
+  "due": "Due",
+  "smoothed": "Smoothed",
+  "actual": "Actual",
+  "forecast": "Forecast",
+  "totals": "Totals",
+  "incomes": "Incomes",
+  "costs": "Costs",
+  "balance": "Balance",
+  "runningAtEnd": "Running balance at the end of the month",
+  "transactions": "Transactions",
+  "transactionButton": "Transaction",
+  "fromShared": "from a shared budget",
+  "pots": "Pots",
+  "addPot": "Add a pot",
+  "goal": "goal {amount}",
+  "@goal": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "goalBy": "goal {amount} by {date}",
+  "@goalBy": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "until": "until {date}",
+  "@until": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "addLine": "Add a line",
+  "cancel": "Cancel",
+  "ok": "OK",
+  "yes": "Yes",
+  "category": "Category",
+  "amount": "Amount",
+  "income": "Income",
+  "note": "Note",
+  "date": "Date",
+  "firstDue": "First due",
+  "from": "From",
+  "lastDay": "Last day",
+  "by": "By",
+  "newLine": "New line",
+  "newTransaction": "New transaction",
+  "newPot": "New pot",
+  "feedsNoPot": "Feeds no pot",
+  "feedsPot": "Feeds {pot}",
+  "@feedsPot": {
+    "placeholders": {
+      "pot": {
+        "type": "String"
+      }
+    }
+  },
+  "unplanned": "Unplanned",
+  "noPot": "No pot",
+  "intoPot": "Into {pot}",
+  "@intoPot": {
+    "placeholders": {
+      "pot": {
+        "type": "String"
+      }
+    }
+  },
+  "paidFromPot": "Paid from {pot}",
+  "@paidFromPot": {
+    "placeholders": {
+      "pot": {
+        "type": "String"
+      }
+    }
+  },
+  "goalOptional": "Goal (optional)",
+  "byADate": "By a date",
+  "changeFromDate": "Change the amount from a date…",
+  "endIt": "End it…",
+  "endsChange": "Ends {date}: change…",
+  "@endsChange": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "removeIt": "Remove it",
+  "changeLine": "Change {name}",
+  "@changeLine": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "monthsBeforeKeep": "The months before keep the old amount.",
+  "endLine": "End {name}",
+  "@endLine": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "goesOn": "Goes on",
+  "removeQuestion": "Remove {name}?",
+  "@removeQuestion": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "removeTransactionQuestion": "Remove this transaction?",
+  "changeItThere": "It comes from a shared budget: change it there.",
+  "repeatMonthly": "monthly",
+  "repeatQuarterly": "quarterly",
+  "repeatYearly": "yearly",
+  "repeatWeekly": "weekly",
+  "repeatOnce": "once"
+}

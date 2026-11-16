@@ -40,7 +40,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _create() async {
-    final name = await askText(context, 'New budget', 'Name');
+    final name = await askText(
+      context,
+      context.words.newBudget,
+      context.words.name,
+    );
     // The screen may have closed while the dialog was open.
     if (name == null || name.isEmpty || !mounted) return;
     await guard(
@@ -53,11 +57,11 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('My budgets')),
+      appBar: AppBar(title: Text(context.words.myBudgets)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _create,
         icon: const Icon(Icons.add),
-        label: const Text('Budget'),
+        label: Text(context.words.budgetButton),
       ),
       // A `FutureBuilder` shows the result of a Future once it arrives,
       // and something else meanwhile.
@@ -72,7 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (budgets.isEmpty) {
-            return const Center(child: Text('No budget yet: add one.'));
+            return Center(child: Text(context.words.noBudget));
           }
           return ListView(
             children: [
@@ -81,13 +85,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 ListTile(
                   leading: Icon(budget.personal ? Icons.person : Icons.group),
                   title: Text(budget.name),
-                  subtitle: Row(
-                    children: [
-                      const Text('Monthly '),
-                      Amount(budget.monthlyBalance, budget.currency),
-                      const Text('   Running '),
-                      Amount(budget.runningBalance, budget.currency),
-                    ],
+                  subtitle: Text(
+                    '${context.words.monthlyAmount(money(budget.monthlyBalance, budget.currency))}'
+                    '    '
+                    '${context.words.runningAmount(money(budget.runningBalance, budget.currency))}',
                   ),
                   onTap: () async {
                     await Navigator.of(context).push(

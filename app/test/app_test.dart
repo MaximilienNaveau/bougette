@@ -60,15 +60,18 @@ void main() {
     expect(find.text('Maison'), findsOneWidget);
     // No income, 1,100 of rent a month; and the running balance is the
     // same, past months having no transaction (their actual is 0).
-    expect(find.text('-1 100.00 EUR'), findsNWidgets(2));
+    expect(
+      find.text('Monthly -€1,100.00    Running -€1,100.00'),
+      findsOneWidget,
+    );
 
     await tester.tap(find.text('Maison'));
     await settle(tester);
-    expect(find.text('$year-01'), findsOneWidget);
-    expect(find.text('$year-12'), findsOneWidget);
+    expect(find.text('January'), findsOneWidget);
+    expect(find.text('December'), findsOneWidget);
     expect(find.text('forecast'), findsOneWidget);
 
-    await tester.tap(find.text('$year-12'));
+    await tester.tap(find.text('December'));
     await settle(tester);
     expect(find.text('Loyer (Logement)'), findsOneWidget);
 
@@ -83,7 +86,7 @@ void main() {
     await tester.tap(find.text('OK'));
     await settle(tester);
     expect(find.text('Vélo'), findsOneWidget);
-    expect(find.text('goal 1 200.00 EUR'), findsOneWidget);
+    expect(find.text('goal €1,200.00'), findsOneWidget);
 
     // The rent has no transaction: it can be removed.
     await tester.tap(find.text('Loyer (Logement)'));
@@ -93,5 +96,37 @@ void main() {
     await tester.tap(find.text('Yes'));
     await settle(tester);
     expect(find.text('Loyer (Logement)'), findsNothing);
+  });
+
+  testWidgets('in French', (tester) async {
+    tester.view.physicalSize = const Size(1600, 1200);
+    tester.view.devicePixelRatio = 1;
+    // The system's language, as the app sees it at start.
+    tester.platformDispatcher.localesTestValue = const [Locale('fr', 'FR')];
+    final app = (await tester.runAsync(() async {
+      final folder = Directory.systemTemp.createTempSync('bougette-test');
+      final app = await App.open(path: '${folder.path}/test.sqlite');
+      final id = await app.createBudget(name: 'Maison', currency: 'EUR');
+      await app.addLine(
+        budget: id,
+        name: 'Loyer',
+        category: 'Logement',
+        income: false,
+        amount: 123456,
+        repeat: Repeat.monthly,
+        first: '${DateTime.now().year}-01-05',
+      );
+      return app;
+    }))!;
+    await tester.pumpWidget(BougetteApp(app: app));
+    await settle(tester);
+    expect(find.text('Mes budgets'), findsOneWidget);
+    // A decimal comma, a narrow no-break space between thousands, and the
+    // symbol after the amount.
+    expect(find.textContaining('1\u202f234,56\u00a0€'), findsOneWidget);
+    await tester.tap(find.text('Maison'));
+    await settle(tester);
+    expect(find.text('janvier'), findsOneWidget);
+    expect(find.text('projection'), findsOneWidget);
   });
 }

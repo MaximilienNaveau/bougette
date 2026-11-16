@@ -9,7 +9,12 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   flutter_rust_bridge: 2.13.0
+  # Formats amounts and dates per language; the version flutter_localizations
+  # pins. Licence: BSD-3-Clause.
+  intl: 0.20.3
 
 dev_dependencies:
   flutter_test:
@@ -18,3 +23,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # Generates the translations (lib/l10n/) from the .arb files.
+  generate: true

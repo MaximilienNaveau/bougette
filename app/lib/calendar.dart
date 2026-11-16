@@ -40,7 +40,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   Future<void> _rename() async {
-    final name = await askText(context, 'Rename', 'Name', initial: _name);
+    final name = await askText(
+      context,
+      context.words.rename,
+      context.words.name,
+      initial: _name,
+    );
     if (name == null || name.isEmpty || !mounted) return;
     final ok = await guard(
       context,
@@ -75,23 +80,23 @@ class _CalendarScreenState extends State<CalendarScreen> {
           IconButton(
             onPressed: () => _moveYear(-1),
             icon: const Icon(Icons.chevron_left),
-            tooltip: 'Previous year',
+            tooltip: context.words.previousYear,
           ),
           Center(child: Text('$_year')),
           IconButton(
             onPressed: () => _moveYear(1),
             icon: const Icon(Icons.chevron_right),
-            tooltip: 'Next year',
+            tooltip: context.words.nextYear,
           ),
           // A menu of the budget's settings.
           PopupMenuButton<VoidCallback>(
             onSelected: (action) => action(),
             itemBuilder: (context) => [
-              PopupMenuItem(value: _rename, child: const Text('Rename')),
+              PopupMenuItem(value: _rename, child: Text(context.words.rename)),
               CheckedPopupMenuItem(
                 value: _togglePersonal,
                 checked: _personal,
-                child: const Text('My personal budget'),
+                child: Text(context.words.personalBudget),
               ),
             ],
           ),
@@ -172,15 +177,18 @@ class _MonthTile extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(cell.month, style: Theme.of(context).textTheme.titleMedium),
               Text(
-                sourceLabel(cell.source),
+                monthTitle(cell.month, withYear: false),
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              Text(
+                sourceLabel(context, cell.source),
                 style: Theme.of(context).textTheme.labelSmall,
               ),
               const Spacer(),
               Amount(cell.expected, currency, status: cell.status),
               Text(
-                'running ${money(cell.running, currency)}',
+                context.words.runningAmount(money(cell.running, currency)),
                 textAlign: TextAlign.end,
                 style: Theme.of(context).textTheme.bodySmall,
               ),

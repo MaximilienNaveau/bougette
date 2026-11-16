@@ -82,7 +82,8 @@ Chaque jalon est utilisable et testé seul.
 4. **M3 : interface Linux** : Flutter sur le même cœur, vue calendrier et couleurs.
    - l'app n'appelle que `bougette-api`, qui lui donne des vues prêtes à afficher (budgets et soldes, calendrier de l'année, détail d'un mois) ; elle ne calcule rien ;
    - Nix construit la bibliothèque Rust à part et la place à côté de l'app : pas de compilation Rust dans la compilation Flutter ;
-   - restent : les membres, la synchronisation et la récupération dans l'app (pour l'instant en ligne de commande), les traductions (les textes sont en anglais), la modification et la suppression de postes et d'opérations, les cagnottes.
+   - l'app est en français et en anglais (la langue du système), montants et dates compris ; on y modifie, termine et supprime les postes, supprime les opérations, crée et alimente les cagnottes ;
+   - restent : les membres, la synchronisation et la récupération dans l'app (pour l'instant en ligne de commande), et la traduction des messages d'erreur venant de Rust (en anglais).
 
 Viennent ensuite : Android, Windows, le NAS puis datcat.fr, et F-Droid/nixpkgs.
 

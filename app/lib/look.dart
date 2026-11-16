@@ -1,24 +1,47 @@
-// How figures look: amounts, and the colours of statuses and sources.
-// Presentation only: what is over or under is decided in Rust.
+// How things look: amounts and months in the user's language, the words
+// of the interface, and the colours of statuses and sources. Presentation
+// only: what is over or under is decided in Rust.
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
+import 'l10n/app_localizations.dart';
 import 'src/rust/api.dart';
 
-/// An amount of cents as `-1 234.56 EUR`. (Proper localisation, with
-/// decimal commas and currency symbols, comes with the translations.)
-String money(int cents, String currency) {
-  final sign = cents < 0 ? '-' : '';
-  final units = (cents.abs() ~/ 100).toString(); // `~/`: integer division
-  final rest = (cents.abs() % 100).toString().padLeft(2, '0');
-  // Groups of three digits, from the right, separated by spaces.
-  final grouped = StringBuffer();
-  for (var i = 0; i < units.length; i++) {
-    if (i > 0 && (units.length - i) % 3 == 0) grouped.write(' ');
-    grouped.write(units[i]);
-  }
-  return '$sign$grouped.$rest $currency';
+/// The interface's texts in the current language: `context.words.pots`.
+// An *extension* adds a getter to an existing class (BuildContext), like
+// a free function called with member syntax.
+extension Words on BuildContext {
+  AppLocalizations get words => AppLocalizations.of(this);
 }
+
+/// An amount of cents in the current language: `1 234,56 €` in French,
+/// `€1,234.56` in English.
+String money(int cents, String currency) {
+  // `simpleCurrency` uses the currency's symbol (€) where there is one.
+  final format = NumberFormat.simpleCurrency(name: currency);
+  // Dividing into a double only to display it: exact for any amount up to
+  // 2^53 cents. No computation is ever done on it.
+  return format.format(cents / 100);
+}
+
+/// A month (`2026-11`) as `November 2026`, or its name only (`November`).
+String monthTitle(String month, {bool withYear = true}) {
+  final date = DateTime.parse('$month-01');
+  return (withYear ? DateFormat.yMMMM() : DateFormat.MMMM()).format(date);
+}
+
+/// A date (`2026-11-05`) as the language writes it: `5 nov. 2026`.
+String dateText(String date) => DateFormat.yMMMd().format(DateTime.parse(date));
+
+/// How a line repeats, in words.
+String repeatLabel(BuildContext context, Repeat repeat) => switch (repeat) {
+  Repeat.monthly => context.words.repeatMonthly,
+  Repeat.quarterly => context.words.repeatQuarterly,
+  Repeat.yearly => context.words.repeatYearly,
+  Repeat.weekly => context.words.repeatWeekly,
+  Repeat.once => context.words.repeatOnce,
+};
 
 /// The colour of a cost compared with its plan (doc/scope.md): green
 /// under, orange close, red over; none otherwise.
@@ -31,10 +54,10 @@ Color? statusColour(Status status) => switch (status) {
 };
 
 /// How a month's figures were obtained, in words.
-String sourceLabel(Source source) => switch (source) {
-  Source.actual => 'actual',
-  Source.forecast => 'forecast',
-  Source.plan => 'plan',
+String sourceLabel(BuildContext context, Source source) => switch (source) {
+  Source.actual => context.words.sourceActual,
+  Source.forecast => context.words.sourceForecast,
+  Source.plan => context.words.sourcePlan,
 };
 
 /// The background of a month in the calendar: actual months plain,

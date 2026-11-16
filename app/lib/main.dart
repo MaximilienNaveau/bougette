@@ -12,7 +12,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
+import 'package:intl/intl.dart';
+
 import 'home.dart';
+import 'l10n/app_localizations.dart';
 import 'src/rust/api.dart';
 import 'src/rust/frb_generated.dart';
 
@@ -59,6 +62,15 @@ class BougetteApp extends StatelessWidget {
     return MaterialApp(
       title: 'Bougette',
       debugShowCheckedModeBanner: false,
+      // The languages, French and English; the system's is used, English
+      // if it is neither (doc/scope.md).
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      // Amounts and dates follow the language chosen.
+      builder: (context, child) {
+        Intl.defaultLocale = Localizations.localeOf(context).toLanguageTag();
+        return child!;
+      },
       // Light and dark themes from one seed colour; the system picks.
       theme: ThemeData(colorSchemeSeed: Colors.teal),
       darkTheme: ThemeData(

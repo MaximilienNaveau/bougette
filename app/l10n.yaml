@@ -1,0 +1,7 @@
+# Flutter's translations (gen-l10n): one .arb file per language in
+# lib/l10n/, English being the template; the code generated next to them
+# gives `AppLocalizations.of(context).someText`.
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+nullable-getter: false
