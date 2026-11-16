@@ -1,7 +1,7 @@
 # Bougette
 
-> Early stage: a command-line client and a server, with shared,
-> end-to-end encrypted budgets; no graphical app yet.
+> Early stage: a command-line client, a server, and a first Linux app;
+> shared budgets are encrypted end to end.
 
 *Bougette* is the Old French word for a small leather purse, and the
 origin of the English word *budget*.
@@ -46,6 +46,14 @@ nix run . -- recovery setup
 # Bob asks to join; Alice's device lets him in at its next sync.
 nix run . -- accept INVITATION --username bob
 nix run . -- sync
+```
+
+The Linux app (milestone M3, [app/](app/README.md)) shows the budgets, a
+calendar coloured by overspending and the detail of each month, from the
+same database as the command-line client:
+
+```sh
+nix run .#app
 ```
 
 - [doc/scope.md](doc/scope.md): what v1 does and the milestones (French).
