@@ -25,21 +25,29 @@ impl Clock {
     /// timestamp already written (if any), so time never goes backwards
     /// after a restart.
     pub fn new(node: String, last: Option<&str>) -> Clock {
-        // Read back the milliseconds and counter from the text form, or
-        // start from zero. `and_then` chains steps that may each fail.
+        // Read back the milliseconds and counter, or start from zero.
+        // `and_then` chains steps that may each fail.
         let (last_millis, counter) = last
-            .and_then(|timestamp| {
-                // `split('-')` cuts the text at each dash, lazily.
-                let mut parts = timestamp.split('-');
-                let millis = parts.next()?.parse().ok()?;
-                let counter = u16::from_str_radix(parts.next()?, 16).ok()?;
-                Some((millis, counter))
-            })
+            .and_then(parse)
+            .map(|(millis, counter, _)| (millis, counter))
             .unwrap_or((0, 0));
         Clock {
             node,
             last_millis,
             counter,
+        }
+    }
+
+    /// Takes into account a timestamp received from another device, so the
+    /// next ones handed out here sort after it.
+    pub fn observe(&mut self, timestamp: &str) {
+        // Tuples compare element by element, like `std::tuple`'s `<`: the
+        // milliseconds first, then the counter.
+        if let Some((millis, counter, _)) = parse(timestamp)
+            && (millis, counter) > (self.last_millis, self.counter)
+        {
+            self.last_millis = millis;
+            self.counter = counter;
         }
     }
 
@@ -75,6 +83,36 @@ impl Clock {
     }
 }
 
+/// The milliseconds, counter and device of a timestamp, or `None` if
+/// `timestamp` doesn't have exactly the shape `tick` writes (text order is
+/// time order only with those fixed widths).
+// The returned `&str` borrows from `timestamp`: the elided lifetime ties
+// them together.
+pub fn parse(timestamp: &str) -> Option<(u64, u16, &str)> {
+    // `splitn(3, '-')` cuts at the first two dashes only.
+    let mut parts = timestamp.splitn(3, '-');
+    let (millis, counter, node) = (parts.next()?, parts.next()?, parts.next()?);
+    let digits = |text: &str, width: usize, hex: bool| {
+        text.len() == width
+            && text
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (hex && matches!(byte, b'a'..=b'f')))
+    };
+    if !digits(millis, 16, false) || !digits(counter, 4, true) || !digits(node, 16, true) {
+        return None;
+    }
+    Some((
+        millis.parse().ok()?,
+        u16::from_str_radix(counter, 16).ok()?,
+        node,
+    ))
+}
+
+/// The device that wrote `timestamp`, if it is one.
+pub fn node_of(timestamp: &str) -> Option<&str> {
+    parse(timestamp).map(|(_, _, node)| node)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -103,5 +141,29 @@ mod tests {
         let last = "9999999999999998-ffff-00000000000000aa";
         let mut clock = Clock::new("00000000000000aa".to_string(), Some(last));
         assert_eq!(clock.tick(), "9999999999999999-0000-00000000000000aa");
+    }
+
+    #[test]
+    fn reads_timestamps_back() {
+        let timestamp = "0001789000000000-002a-1a2b3c4d5e6f7a8b";
+        assert_eq!(
+            parse(timestamp),
+            Some((1789000000000, 42, "1a2b3c4d5e6f7a8b"))
+        );
+        assert_eq!(node_of(timestamp), Some("1a2b3c4d5e6f7a8b"));
+        assert_eq!(parse("1789000000000-002a-1a2b3c4d5e6f7a8b"), None);
+        assert_eq!(parse("0001789000000000-+02a-1a2b3c4d5e6f7a8b"), None);
+        assert_eq!(parse("0001789000000000-002a-1A2B3C4D5E6F7A8B"), None);
+        assert_eq!(parse("0001789000000000-002a"), None);
+    }
+
+    #[test]
+    fn catches_up_with_other_devices() {
+        let mut clock = Clock::new("00000000000000aa".to_string(), None);
+        clock.observe("9999999999999990-0003-00000000000000bb");
+        assert_eq!(clock.tick(), "9999999999999990-0004-00000000000000aa");
+        // An older timestamp changes nothing.
+        clock.observe("0000000000000001-0000-00000000000000bb");
+        assert_eq!(clock.tick(), "9999999999999990-0005-00000000000000aa");
     }
 }

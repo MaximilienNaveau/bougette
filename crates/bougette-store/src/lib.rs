@@ -9,10 +9,19 @@
 //!
 //! Saving a budget compares it field by field with what is stored, and
 //! writes a message for each difference.
+//!
+//! To sync, two stores compare their version vectors (`versions`): for
+//! each device, the latest of its messages they hold. A device's own
+//! messages have increasing timestamps and are never changed, and a store
+//! always receives a device's messages in order and all at once, so each
+//! store holds a *prefix* of every device's messages. What a store lacks
+//! is therefore exactly each device's messages after its entry
+//! (`missing_for`).
 
 mod clock;
 mod codec;
 
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use bougette_core::budget::Budget;
@@ -48,6 +57,23 @@ impl From<Corrupt> for StoreError {
         StoreError::Corrupt(error)
     }
 }
+
+/// One change of one field, as devices exchange them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Message {
+    /// When and on which device it was made (see `clock`). Unique.
+    pub timestamp: String,
+    pub budget: String,
+    pub entity: String,
+    pub id: String,
+    pub field: String,
+    /// The new value; `None` for an empty optional field.
+    pub value: Option<String>,
+}
+
+/// A version vector: for each device, the timestamp of its latest message
+/// held here.
+pub type Versions = BTreeMap<String, String>;
 
 /// The storage of one device.
 pub struct Store {
@@ -160,19 +186,90 @@ impl Store {
         // like an RAII guard.
         let transaction = self.connection.transaction()?;
         for ((entity, id, field), value) in changes {
-            let timestamp = self.clock.tick();
-            apply(
-                &transaction,
-                &timestamp,
-                &budget_id,
-                &entity,
-                &id,
-                &field,
-                value.as_deref(),
-            )?;
+            let message = Message {
+                timestamp: self.clock.tick(),
+                budget: budget_id.clone(),
+                entity,
+                id,
+                field,
+                value,
+            };
+            apply(&transaction, &message)?;
         }
         transaction.commit()?;
         Ok(())
+    }
+
+    /// This store's version vector.
+    pub fn versions(&self) -> Result<Versions, StoreError> {
+        // The latest timestamp of each device: the device is what follows
+        // the 22 characters of time and counter (SQLite counts from 1).
+        let mut statement = self
+            .connection
+            .prepare("SELECT MAX(timestamp) FROM messages GROUP BY substr(timestamp, 23)")?;
+        let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
+        let mut versions = Versions::new();
+        for row in rows {
+            let timestamp = row?;
+            let node = clock::node_of(&timestamp)
+                .ok_or_else(|| Corrupt(format!("invalid timestamp {timestamp:?}")))?;
+            versions.insert(node.to_string(), timestamp);
+        }
+        Ok(versions)
+    }
+
+    /// The messages held here that a store with version vector `theirs`
+    /// lacks, oldest first.
+    pub fn missing_for(&self, theirs: &Versions) -> Result<Vec<Message>, StoreError> {
+        let mut statement = self.connection.prepare(
+            "SELECT timestamp, budget, entity, id, field, value
+             FROM messages ORDER BY timestamp",
+        )?;
+        let rows = statement.query_map([], |row| {
+            Ok(Message {
+                timestamp: row.get(0)?,
+                budget: row.get(1)?,
+                entity: row.get(2)?,
+                id: row.get(3)?,
+                field: row.get(4)?,
+                value: row.get(5)?,
+            })
+        })?;
+        let mut missing = Vec::new();
+        for row in rows {
+            let message = row?;
+            // Missing if they have nothing from its device, or only older
+            // messages. `is_none_or` is true for `None`, else the test.
+            let node = clock::node_of(&message.timestamp).unwrap_or_default();
+            if theirs
+                .get(node)
+                .is_none_or(|latest| message.timestamp > *latest)
+            {
+                missing.push(message);
+            }
+        }
+        Ok(missing)
+    }
+
+    /// Records messages from another device, all or nothing, and returns
+    /// how many were new. Fails on a malformed timestamp.
+    pub fn receive(&mut self, messages: &[Message]) -> Result<usize, StoreError> {
+        let transaction = self.connection.transaction()?;
+        let mut new = 0;
+        for message in messages {
+            if clock::parse(&message.timestamp).is_none() {
+                return Err(Corrupt(format!("invalid timestamp {:?}", message.timestamp)).into());
+            }
+            if apply(&transaction, message)? {
+                new += 1;
+            }
+        }
+        transaction.commit()?;
+        // Only once committed: our next changes must sort after theirs.
+        for message in messages {
+            self.clock.observe(&message.timestamp);
+        }
+        Ok(new)
     }
 
     /// The budget `id` as currently stored, `None` if unknown or deleted.
@@ -224,26 +321,28 @@ impl Store {
 }
 
 /// Records one message in the log and, if it is the latest change of its
-/// field, makes it the field's current value. Applying the same message
-/// twice, or messages in any order, gives the same result: that's what
-/// will let devices exchange messages in M1.
-// Clippy warns about functions with many parameters; these are the
-// columns of one message.
-#[allow(clippy::too_many_arguments)]
-fn apply(
-    connection: &Connection,
-    timestamp: &str,
-    budget: &str,
-    entity: &str,
-    id: &str,
-    field: &str,
-    value: Option<&str>,
-) -> Result<(), StoreError> {
-    connection.execute(
+/// field, makes it the field's current value; returns whether the message
+/// was new. Applying the same message twice, or messages in any order,
+/// gives the same result: that's what lets devices exchange them freely.
+fn apply(connection: &Connection, message: &Message) -> Result<bool, StoreError> {
+    // Destructure the message into its fields, borrowed.
+    let Message {
+        timestamp,
+        budget,
+        entity,
+        id,
+        field,
+        value,
+    } = message;
+    // `execute` returns the number of rows changed: 0 if already there.
+    let inserted = connection.execute(
         "INSERT OR IGNORE INTO messages (timestamp, budget, entity, id, field, value)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         params![timestamp, budget, entity, id, field, value],
     )?;
+    if inserted == 0 {
+        return Ok(false);
+    }
     // Insert the field, or update it only if this message is newer.
     connection.execute(
         "INSERT INTO fields (budget, entity, id, field, value, timestamp)
@@ -253,7 +352,7 @@ fn apply(
          WHERE excluded.timestamp > fields.timestamp",
         params![budget, entity, id, field, value, timestamp],
     )?;
-    Ok(())
+    Ok(true)
 }
 
 #[cfg(test)]
@@ -419,14 +518,75 @@ mod tests {
     fn the_latest_change_of_a_field_wins_whatever_the_order() {
         let store = Store::open_in_memory().unwrap();
         let connection = &store.connection;
-        // Two messages for the same field, applied newest first.
-        apply(connection, "2", "b", "budget", "b", "name", Some("New")).unwrap();
-        apply(connection, "1", "b", "budget", "b", "name", Some("Old")).unwrap();
+        let rename = |timestamp: &str, name: &str| Message {
+            timestamp: timestamp.to_string(),
+            budget: "b".to_string(),
+            entity: "budget".to_string(),
+            id: "b".to_string(),
+            field: "name".to_string(),
+            value: Some(name.to_string()),
+        };
+        // Two messages for the same field, applied newest first, and the
+        // newest one twice.
+        assert!(apply(connection, &rename("2", "New")).unwrap());
+        assert!(apply(connection, &rename("1", "Old")).unwrap());
+        assert!(!apply(connection, &rename("2", "New")).unwrap());
         let name: String = connection
             .query_row("SELECT value FROM fields WHERE field = 'name'", [], |row| {
                 row.get(0)
             })
             .unwrap();
         assert_eq!(name, "New");
+    }
+
+    /// Sends `from` what `to` lacks; returns how many messages were new.
+    fn sync(from: &Store, to: &mut Store) -> usize {
+        let missing = from.missing_for(&to.versions().unwrap()).unwrap();
+        to.receive(&missing).unwrap()
+    }
+
+    #[test]
+    fn two_devices_converge() {
+        let mut laptop = Store::open_in_memory().unwrap();
+        let mut phone = Store::open_in_memory().unwrap();
+        let mut budget = sample();
+        laptop.save(&budget).unwrap();
+        let sent = sync(&laptop, &mut phone);
+        assert!(sent > 0);
+        assert_eq!(phone.load(budget.id).unwrap(), Some(budget.clone()));
+        // Nothing left to send either way.
+        assert_eq!(sync(&laptop, &mut phone), 0);
+        assert_eq!(sync(&phone, &mut laptop), 0);
+
+        // Both rename the budget offline; the phone renames it later, so
+        // its name wins on both once they sync both ways.
+        budget.name = "From the laptop".to_string();
+        laptop.save(&budget).unwrap();
+        let mut on_phone = phone.load(budget.id).unwrap().unwrap();
+        on_phone.name = "From the phone".to_string();
+        phone.save(&on_phone).unwrap();
+        assert_eq!(sync(&phone, &mut laptop), 1);
+        assert_eq!(sync(&laptop, &mut phone), 1);
+        assert_eq!(laptop.load(budget.id).unwrap(), Some(on_phone.clone()));
+        assert_eq!(phone.load(budget.id).unwrap(), Some(on_phone));
+        assert_eq!(laptop.versions().unwrap(), phone.versions().unwrap());
+    }
+
+    #[test]
+    fn refuses_malformed_timestamps() {
+        let mut store = Store::open_in_memory().unwrap();
+        let message = Message {
+            timestamp: "yesterday".to_string(),
+            budget: "b".to_string(),
+            entity: "budget".to_string(),
+            id: "b".to_string(),
+            field: "name".to_string(),
+            value: None,
+        };
+        assert!(matches!(
+            store.receive(&[message]),
+            Err(StoreError::Corrupt(_))
+        ));
+        assert!(store.versions().unwrap().is_empty());
     }
 }
