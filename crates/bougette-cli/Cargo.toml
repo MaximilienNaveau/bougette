@@ -15,6 +15,7 @@ path = "src/main.rs"
 [dependencies]
 bougette-core = { path = "../bougette-core" }
 bougette-store = { path = "../bougette-store" }
+bougette-sync = { path = "../bougette-sync" }
 # Dates, plus the system time zone to know today's date where the user is:
 # "tz-system" finds the zone, "tzdb-zoneinfo" reads its rules from
 # /usr/share/zoneinfo. No time zone data is bundled.
@@ -23,3 +24,6 @@ jiff = { version = "0.2", default-features = false, features = [
     "tz-system",
     "tzdb-zoneinfo",
 ] }
+# The async runtime that drives the network commands, on the main thread
+# ("rt"), with sockets ("net") and timers ("time") for iroh.
+tokio = { version = "1.54", features = ["rt", "net", "time"] }

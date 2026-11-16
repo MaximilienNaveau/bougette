@@ -43,6 +43,12 @@ Transactions (the actual)
 Pots
   pot add BUDGET NAME [GOAL [BY]]
 
+Devices (sync)
+  id                               this device's identifier
+  serve --allow ID[,ID...] [--port PORT]
+                                   wait for those devices to sync, forever
+  sync ADDRESS                     sync with a serving device (ID@IP:PORT)
+
 Fair-split calculator (stores nothing)
   split TOTAL|BUDGET INCOME... [--rule income|equal] [--month MONTH]
                                    BUDGET: its smoothed costs of the month
@@ -55,8 +61,8 @@ Database: --db FILE, or $XDG_DATA_HOME/bougette/bougette.sqlite.
 ";
 
 /// The options, each followed by a value.
-const OPTIONS: [&str; 9] = [
-    "db", "today", "month", "pot", "line", "into", "from", "note", "rule",
+const OPTIONS: [&str; 11] = [
+    "db", "today", "month", "pot", "line", "into", "from", "note", "rule", "allow", "port",
 ];
 
 /// What every command may need.

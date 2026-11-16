@@ -1,10 +1,12 @@
-//! `bougette`: the command-line client of M0, over `bougette-core` and
-//! `bougette-store`. It reads words, calls the domain and prints the
-//! result; every computation is in the core (CLAUDE.md, §4).
+//! `bougette`: the command-line client, over `bougette-core`,
+//! `bougette-store` and `bougette-sync`. It reads words, calls the core
+//! and prints the result; every computation is in the core (CLAUDE.md,
+//! §4).
 
 // `mod commands;` compiles src/commands.rs as a module of this crate, like
 // adding a .cpp file to the target, but with its own namespace.
 mod commands;
+mod network;
 
 use std::io::IsTerminal;
 use std::path::PathBuf;
@@ -48,6 +50,15 @@ fn try_main(arguments: Vec<String>) -> Result<String, String> {
             .map_err(|error| format!("{}: {error}", folder.display()))?;
     }
     let mut store = Store::open(&path).map_err(|error| format!("{}: {error:?}", path.display()))?;
+    // The words as `&str` views of the Strings, which the commands match
+    // with slice patterns. `String::as_str` is a function used as a
+    // closure.
+    let words: Vec<&str> = words.iter().map(String::as_str).collect();
+    // `matches!` with alternatives `|`: the commands that talk to other
+    // devices take the store itself, to share it between tasks.
+    if matches!(words.as_slice(), ["id"] | ["serve"] | ["sync", _]) {
+        return network::run(&words, &options, store);
+    }
     let today = match options.get("today") {
         Some(day) => commands::parse_date(day)?,
         // Now, in the system's time zone, reduced to a calendar date.
@@ -56,10 +67,6 @@ fn try_main(arguments: Vec<String>) -> Result<String, String> {
     // Colours only on a terminal, and never if NO_COLOR is set
     // (no-color.org).
     let colour = std::io::stdout().is_terminal() && std::env::var_os("NO_COLOR").is_none();
-    // The words as `&str` views of the Strings, which the commands match
-    // with slice patterns. `String::as_str` is a function used as a
-    // closure.
-    let words: Vec<&str> = words.iter().map(String::as_str).collect();
     let mut context = Context {
         store: &mut store,
         today,

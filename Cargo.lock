@@ -171,7 +171,9 @@ version = "0.1.0"
 dependencies = [
  "bougette-core",
  "bougette-store",
+ "bougette-sync",
  "jiff",
+ "tokio",
 ]
 
 [[package]]
