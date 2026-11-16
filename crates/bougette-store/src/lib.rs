@@ -20,6 +20,7 @@
 
 mod clock;
 mod codec;
+pub mod crypto;
 
 use std::collections::BTreeMap;
 use std::path::Path;

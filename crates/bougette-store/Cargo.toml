@@ -17,5 +17,23 @@ jiff = { version = "0.2", default-features = false, features = ["std"] }
 # and still built from source (F-Droid). Licence: MIT; SQLite is public
 # domain.
 rusqlite = { version = "0.43", features = ["bundled"] }
-# To parse the identifiers stored as text, and draw the device's.
-uuid = { version = "1.29", features = ["v7"] }
+# To parse the identifiers stored as text, and draw the device's; v8 for
+# budget identifiers derived from their creator's key (ADR 0005).
+uuid = { version = "1.29", features = ["v7", "v8"] }
+
+# Cryptography (ADR 0005), all pure Rust. The dalek crates are
+# BSD-3-Clause, the RustCrypto ones MIT OR Apache-2.0.
+# Signatures: each message is signed with its author's member key.
+ed25519-dalek = "3"
+# Key agreement: a budget key is sealed for each member's public key.
+x25519-dalek = { version = "3", features = ["static_secrets"] }
+# Authenticated encryption of message contents and of the backup.
+chacha20poly1305 = { version = "0.11", default-features = false, features = ["alloc"] }
+# Stretching the recovery phrase into a key: slow on purpose, against
+# guessing.
+argon2 = { version = "0.6", default-features = false, features = ["alloc"] }
+# Hashes and keyed hashes (identifiers, invitation proofs).
+hmac = "0.13"
+sha2 = "0.11"
+# Random bytes from the operating system, for keys and nonces.
+getrandom = "0.4"
