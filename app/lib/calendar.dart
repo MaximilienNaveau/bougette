@@ -5,6 +5,7 @@
 
 import 'package:flutter/material.dart';
 
+import 'forms.dart';
 import 'look.dart';
 import 'month.dart';
 import 'src/rust/api.dart';
@@ -22,6 +23,9 @@ class CalendarScreen extends StatefulWidget {
 class _CalendarScreenState extends State<CalendarScreen> {
   int _year = DateTime.now().year;
   late Future<List<MonthCell>> _months;
+  // The name and flag as changed here (the summary given is a snapshot).
+  late String _name = widget.budget.name;
+  late bool _personal = widget.budget.personal;
 
   @override
   void initState() {
@@ -35,6 +39,27 @@ class _CalendarScreenState extends State<CalendarScreen> {
     });
   }
 
+  Future<void> _rename() async {
+    final name = await askText(context, 'Rename', 'Name', initial: _name);
+    if (name == null || name.isEmpty || !mounted) return;
+    final ok = await guard(
+      context,
+      () => widget.app.renameBudget(budget: widget.budget.id, name: name),
+    );
+    if (ok) setState(() => _name = name);
+  }
+
+  Future<void> _togglePersonal() async {
+    final ok = await guard(
+      context,
+      () => widget.app.setPersonal(
+        budget: widget.budget.id,
+        personal: !_personal,
+      ),
+    );
+    if (ok) setState(() => _personal = !_personal);
+  }
+
   void _moveYear(int by) {
     _year += by;
     _load();
@@ -45,7 +70,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final currency = widget.budget.currency;
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.budget.name),
+        title: Text(_name),
         actions: [
           IconButton(
             onPressed: () => _moveYear(-1),
@@ -57,6 +82,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
             onPressed: () => _moveYear(1),
             icon: const Icon(Icons.chevron_right),
             tooltip: 'Next year',
+          ),
+          // A menu of the budget's settings.
+          PopupMenuButton<VoidCallback>(
+            onSelected: (action) => action(),
+            itemBuilder: (context) => [
+              PopupMenuItem(value: _rename, child: const Text('Rename')),
+              CheckedPopupMenuItem(
+                value: _togglePersonal,
+                checked: _personal,
+                child: const Text('My personal budget'),
+              ),
+            ],
           ),
         ],
       ),

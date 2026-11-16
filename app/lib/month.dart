@@ -1,5 +1,6 @@
 // One month of a budget: each line planned and actual, the transactions,
-// the totals, the running balance and the pots.
+// the totals, the running balance and the pots. Tapping a line or a
+// transaction offers what can be done to it.
 
 import 'package:flutter/material.dart';
 
@@ -38,8 +39,15 @@ class _MonthScreenState extends State<MonthScreen> {
     });
   }
 
+  /// Runs a form, and reloads the month if it changed something.
+  Future<void> _then(Future<bool> changed) async {
+    if (await changed) _load();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final app = widget.app;
+    final budget = widget.budget;
     return FutureBuilder(
       future: _view,
       builder: (context, snapshot) {
@@ -58,27 +66,15 @@ class _MonthScreenState extends State<MonthScreen> {
                     FloatingActionButton.small(
                       heroTag: 'line',
                       tooltip: 'Add a line',
-                      onPressed: () async {
-                        if (await addLine(context, widget.app, widget.budget)) {
-                          _load();
-                        }
-                      },
+                      onPressed: () =>
+                          _then(addLine(context, app, budget, view.pots)),
                       child: const Icon(Icons.playlist_add),
                     ),
                     const SizedBox(height: 8),
                     FloatingActionButton.extended(
                       heroTag: 'transaction',
-                      onPressed: () async {
-                        final added = await addTransaction(
-                          context,
-                          widget.app,
-                          widget.budget,
-                          view,
-                        );
-                        if (added) {
-                          _load();
-                        }
-                      },
+                      onPressed: () =>
+                          _then(addTransaction(context, app, budget, view)),
                       icon: const Icon(Icons.add),
                       label: const Text('Transaction'),
                     ),
@@ -88,17 +84,57 @@ class _MonthScreenState extends State<MonthScreen> {
               ? Center(child: Text('${snapshot.error}'))
               : view == null
               ? const Center(child: CircularProgressIndicator())
-              : _MonthBody(view: view),
+              : _MonthBody(
+                  view: view,
+                  onLine: (line) => _then(editLine(context, app, budget, line)),
+                  onTransaction: (transaction) => _then(
+                    _removeTransaction(context, app, budget, transaction),
+                  ),
+                  onAddPot: () => _then(addPot(context, app, budget)),
+                ),
         );
       },
     );
   }
 }
 
+/// Asks, then removes a transaction; a reflection can't be removed here.
+Future<bool> _removeTransaction(
+  BuildContext context,
+  App app,
+  String budget,
+  TransactionRow transaction,
+) async {
+  if (transaction.reflected) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('It comes from a shared budget: change it there.'),
+      ),
+    );
+    return false;
+  }
+  if (!await confirm(context, 'Remove this transaction?') || !context.mounted) {
+    return false;
+  }
+  return guard(
+    context,
+    () => app.removeTransaction(budget: budget, transaction: transaction.id),
+  );
+}
+
 class _MonthBody extends StatelessWidget {
-  const _MonthBody({required this.view});
+  const _MonthBody({
+    required this.view,
+    required this.onLine,
+    required this.onTransaction,
+    required this.onAddPot,
+  });
 
   final MonthView view;
+  // Callbacks: what the screen does when something is tapped.
+  final void Function(LineRow) onLine;
+  final void Function(TransactionRow) onTransaction;
+  final VoidCallback onAddPot;
 
   @override
   Widget build(BuildContext context) {
@@ -108,10 +144,11 @@ class _MonthBody extends StatelessWidget {
     DataCell cell(int cents, [Status status = Status.none]) =>
         DataCell(Amount(cents, currency, status: status));
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
       children: [
         Text('Lines (${sourceLabel(view.source)})', style: heading),
         DataTable(
+          showCheckboxColumn: false,
           columns: const [
             DataColumn(label: Text('Line')),
             DataColumn(label: Text('Due'), numeric: true),
@@ -121,6 +158,8 @@ class _MonthBody extends StatelessWidget {
           rows: [
             for (final line in view.lines)
               DataRow(
+                // Tapping the row opens what can be done to the line.
+                onSelectChanged: (_) => onLine(line),
                 cells: [
                   DataCell(
                     Row(
@@ -131,6 +170,11 @@ class _MonthBody extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         Text('${line.name} (${line.category})'),
+                        if (line.endsOn != null)
+                          Text(
+                            '  until ${line.endsOn}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
                       ],
                     ),
                   ),
@@ -152,7 +196,8 @@ class _MonthBody extends StatelessWidget {
             DataColumn(label: Text('Forecast'), numeric: true),
           ],
           rows: [
-            // A local function: the row of one total, from the four views.
+            // A list of records `(label, pick)`: each row's name and the
+            // function picking its figure from a set of totals.
             for (final (label, pick) in <(String, int Function(Totals))>[
               ('Incomes', (totals) => totals.incomes),
               ('Costs', (totals) => totals.costs),
@@ -182,6 +227,7 @@ class _MonthBody extends StatelessWidget {
           for (final transaction in view.transactions)
             ListTile(
               dense: true,
+              onTap: () => onTransaction(transaction),
               leading: Text(transaction.date),
               title: Text(
                 [
@@ -190,25 +236,39 @@ class _MonthBody extends StatelessWidget {
                   if (transaction.note.isNotEmpty) transaction.note,
                 ].join(' · '),
               ),
+              subtitle: transaction.reflected
+                  ? const Text('from a shared budget')
+                  : null,
               trailing: Amount(
                 transaction.income ? transaction.amount : -transaction.amount,
                 currency,
               ),
             ),
         ],
-        if (view.pots.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          Text('Pots', style: heading),
-          for (final pot in view.pots)
-            ListTile(
-              dense: true,
-              title: Text(pot.name),
-              subtitle: pot.goal == null
-                  ? null
-                  : Text('goal ${money(pot.goal!, currency)}'),
-              trailing: Amount(pot.balance, currency),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Text('Pots', style: heading),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: onAddPot,
+              icon: const Icon(Icons.savings),
+              label: const Text('Add a pot'),
             ),
-        ],
+          ],
+        ),
+        for (final pot in view.pots)
+          ListTile(
+            dense: true,
+            title: Text(pot.name),
+            subtitle: pot.goal == null
+                ? null
+                : Text(
+                    'goal ${money(pot.goal!, currency)}'
+                    '${pot.goalBy == null ? '' : ' by ${pot.goalBy}'}',
+                  ),
+            trailing: Amount(pot.balance, currency),
+          ),
       ],
     );
   }

@@ -71,5 +71,27 @@ void main() {
     await tester.tap(find.text('$year-12'));
     await settle(tester);
     expect(find.text('Loyer (Logement)'), findsOneWidget);
+
+    // A pot, through its form.
+    await tester.tap(find.text('Add a pot'));
+    await settle(tester);
+    await tester.enterText(find.widgetWithText(TextField, 'Name'), 'Vélo');
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Goal (optional)'),
+      '1200',
+    );
+    await tester.tap(find.text('OK'));
+    await settle(tester);
+    expect(find.text('Vélo'), findsOneWidget);
+    expect(find.text('goal 1 200.00 EUR'), findsOneWidget);
+
+    // The rent has no transaction: it can be removed.
+    await tester.tap(find.text('Loyer (Logement)'));
+    await settle(tester);
+    await tester.tap(find.text('Remove it'));
+    await settle(tester);
+    await tester.tap(find.text('Yes'));
+    await settle(tester);
+    expect(find.text('Loyer (Logement)'), findsNothing);
   });
 }
