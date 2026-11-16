@@ -141,6 +141,39 @@ impl Money {
         let minor_units = i64::try_from(rounded).expect("amount overflows i64");
         Money::new(minor_units, self.currency)
     }
+
+    /// Reads an amount as typed by someone: `12`, `12.5`, `-12.34`, with a
+    /// dot or a comma and at most two decimals. `None` if it isn't one.
+    pub fn parse(text: &str, currency: Currency) -> Option<Money> {
+        // `strip_prefix` gives the rest of the text if it starts with '-'.
+        let (negative, digits) = match text.strip_prefix('-') {
+            Some(rest) => (true, rest),
+            None => (false, text),
+        };
+        // `split_once` cuts at the first '.' or ',' (an array of chars is a
+        // pattern matching any of them): `Some(("12", "34"))`, or `None`
+        // when there is no separator.
+        let (units, cents) = match digits.split_once(['.', ',']) {
+            Some((units, cents)) if !cents.is_empty() => (units, cents),
+            Some(_) => return None, // "12." has nothing after the dot
+            None => (digits, ""),
+        };
+        // A closure stored in a variable, called like a function below.
+        let only_digits = |part: &str| part.bytes().all(|byte| byte.is_ascii_digit());
+        if units.is_empty() || cents.len() > 2 || !only_digits(units) || !only_digits(cents) {
+            return None;
+        }
+        // `parse::<i64>()` fails on overflow: `.ok()?` turns that into
+        // `None`. `{cents:0<2}` pads on the right: "5" becomes "50".
+        let units: i64 = units.parse().ok()?;
+        let cents: i64 = format!("{cents:0<2}").parse().ok()?;
+        // `checked_*` return `None` on overflow instead of panicking.
+        let minor_units = units.checked_mul(100)?.checked_add(cents)?;
+        Some(Money::new(
+            if negative { -minor_units } else { minor_units },
+            currency,
+        ))
+    }
 }
 
 // Operator overloading is done by implementing the trait behind the
@@ -228,6 +261,21 @@ mod tests {
         );
         assert_eq!(Currency::from_code("eur"), None);
         assert_eq!(Currency::from_code("EURO"), None);
+    }
+
+    #[test]
+    fn parses_typed_amounts() {
+        let parse = |text| Money::parse(text, Currency::EUR).map(|m| m.minor_units());
+        assert_eq!(parse("12"), Some(1200));
+        assert_eq!(parse("12.5"), Some(1250));
+        assert_eq!(parse("12,34"), Some(1234));
+        assert_eq!(parse("-0.05"), Some(-5));
+        assert_eq!(parse("12."), None);
+        assert_eq!(parse(".5"), None);
+        assert_eq!(parse("1.234"), None);
+        assert_eq!(parse("+3"), None);
+        assert_eq!(parse("12 EUR"), None);
+        assert_eq!(parse("99999999999999999999"), None);
     }
 
     #[test]
