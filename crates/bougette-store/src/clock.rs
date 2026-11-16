@@ -53,12 +53,7 @@ impl Clock {
 
     /// A new timestamp, later than every one handed out before.
     pub fn tick(&mut self) -> String {
-        // Milliseconds since 1970. `duration_since` fails only if the
-        // system clock is set before 1970; count that as 0.
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|elapsed| elapsed.as_millis() as u64)
-            .unwrap_or(0);
+        let now = now();
         if now > self.last_millis {
             // The wall clock moved on: use it, and restart the counter.
             self.last_millis = now;
@@ -106,6 +101,15 @@ pub fn parse(timestamp: &str) -> Option<(u64, u16, &str)> {
         u16::from_str_radix(counter, 16).ok()?,
         node,
     ))
+}
+
+/// The wall-clock time in milliseconds since 1970. `duration_since` fails
+/// only if the system clock is set before 1970; count that as 0.
+pub fn now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_millis() as u64)
+        .unwrap_or(0)
 }
 
 /// The device that wrote `timestamp`, if it is one.

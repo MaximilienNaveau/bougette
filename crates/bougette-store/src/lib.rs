@@ -1,28 +1,38 @@
-//! Bougette's local storage: every change is a timestamped message in a
-//! SQLite log, and the current state is rebuilt from those messages.
+//! Bougette's local storage: every change is a signed message in a SQLite
+//! log, and the current state is rebuilt from those messages.
 //!
-//! Two tables:
-//! - `messages`: the log, one row per changed field, never modified. In
-//!   M1 these are what devices exchange to sync.
-//! - `fields`: the latest value of each field, i.e. the message with the
-//!   greatest timestamp for that field ("the latest change wins").
-//!
-//! Saving a budget compares it field by field with what is stored, and
-//! writes a message for each difference.
+//! Tables:
+//! - `messages`: the log, one row per changed field, never modified. These
+//!   are what devices exchange. Their content is encrypted with a key of
+//!   their budget, except access changes (see `access`), and each is
+//!   signed by its author (see `message`).
+//! - `fields`: the current value of each field, decrypted: the latest
+//!   change by someone allowed to make it at the time (see `rebuild`).
+//! - `keys`: the budget keys this device holds.
+//! - `invitations`: the invitations this device made, with their secret.
+//! - `meta`: the device's settings, never synced.
 //!
 //! To sync, two stores compare their version vectors (`versions`): for
-//! each device, the latest of its messages they hold. A device's own
-//! messages have increasing timestamps and are never changed, and a store
-//! always receives a device's messages in order and all at once, so each
-//! store holds a *prefix* of every device's messages. What a store lacks
-//! is therefore exactly each device's messages after its entry
-//! (`missing_for`).
+//! each budget and device, the latest of its messages they hold. A
+//! device's own messages have increasing timestamps and are never changed,
+//! and a store always receives a device's messages of a budget in order
+//! and all at once, so each store holds a *prefix* of them. What a store
+//! lacks is therefore exactly the messages after its entry (`missing_for`,
+//! ADR 0004).
+//!
+//! A server (`open_server`) only keeps and passes on messages: it never
+//! decrypts, and only reads the access changes.
 
+mod access;
+mod backup;
+mod bytes;
 mod clock;
 mod codec;
 pub mod crypto;
+mod members;
+mod message;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use bougette_core::budget::Budget;
@@ -30,18 +40,26 @@ use bougette_core::id::BudgetId;
 use rusqlite::{Connection, OptionalExtension, params};
 use uuid::Uuid;
 
+pub use crate::access::{Access, Role};
 use crate::clock::Clock;
 // `pub use` re-exports: users of this crate see `bougette_store::Corrupt`.
 pub use crate::codec::Corrupt;
-use crate::codec::{DELETED, Key, Records};
+use crate::codec::{DELETED, Records};
+use crate::crypto::Identity;
+pub use crate::members::{Invitation, MemberInfo};
+pub use crate::message::{Body, Change, Message};
 
 /// Why a storage operation failed.
 #[derive(Debug)]
 pub enum StoreError {
     /// SQLite reported an error.
     Sqlite(rusqlite::Error),
-    /// The stored fields don't make a valid budget.
+    /// Stored or received data isn't valid.
     Corrupt(Corrupt),
+    /// The member may not do this, e.g. a Reader changing a budget.
+    NotAllowed(String),
+    /// This device holds no key of the budget yet.
+    NoKey,
 }
 
 // Implementing `From` lets the `?` operator convert a rusqlite error into
@@ -59,31 +77,22 @@ impl From<Corrupt> for StoreError {
     }
 }
 
-/// One change of one field, as devices exchange them.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Message {
-    /// When and on which device it was made (see `clock`). Unique.
-    pub timestamp: String,
-    pub budget: String,
-    pub entity: String,
-    pub id: String,
-    pub field: String,
-    /// The new value; `None` for an empty optional field.
-    pub value: Option<String>,
-}
+/// A version vector: for each budget and device, the timestamp of the
+/// latest message held here.
+pub type Versions = BTreeMap<(String, String), String>;
 
-/// A version vector: for each device, the timestamp of its latest message
-/// held here.
-pub type Versions = BTreeMap<String, String>;
-
-/// The storage of one device.
+/// The storage of one device, or of a server.
 pub struct Store {
     connection: Connection,
     clock: Clock,
+    /// The member this device belongs to; drawn when first needed.
+    identity: Option<Identity>,
+    /// Whether to decrypt and rebuild budgets: false on a server.
+    replays: bool,
 }
 
-/// The database schema. `IF NOT EXISTS` makes opening an existing file
-/// harmless.
+/// The database schema, version 2 (SQLite's `user_version`). `IF NOT
+/// EXISTS` makes opening an existing file harmless.
 const SCHEMA: &str = "
     CREATE TABLE IF NOT EXISTS meta (
         key TEXT PRIMARY KEY,
@@ -92,11 +101,12 @@ const SCHEMA: &str = "
     CREATE TABLE IF NOT EXISTS messages (
         timestamp TEXT PRIMARY KEY,
         budget TEXT NOT NULL,
-        entity TEXT NOT NULL,
-        id TEXT NOT NULL,
-        field TEXT NOT NULL,
-        value TEXT
+        author TEXT NOT NULL,
+        key INTEGER,
+        body BLOB NOT NULL,
+        signature BLOB NOT NULL
     );
+    CREATE INDEX IF NOT EXISTS messages_by_budget ON messages (budget, timestamp);
     CREATE TABLE IF NOT EXISTS fields (
         budget TEXT NOT NULL,
         entity TEXT NOT NULL,
@@ -104,23 +114,56 @@ const SCHEMA: &str = "
         field TEXT NOT NULL,
         value TEXT,
         timestamp TEXT NOT NULL,
+        author TEXT NOT NULL,
         PRIMARY KEY (budget, entity, id, field)
     );
+    CREATE TABLE IF NOT EXISTS keys (
+        budget TEXT NOT NULL,
+        number INTEGER NOT NULL,
+        key BLOB NOT NULL,
+        PRIMARY KEY (budget, number)
+    );
+    CREATE TABLE IF NOT EXISTS invitations (
+        id TEXT PRIMARY KEY,
+        budget TEXT NOT NULL,
+        secret BLOB NOT NULL,
+        role TEXT NOT NULL,
+        expires INTEGER NOT NULL,
+        used INTEGER NOT NULL DEFAULT 0
+    );
+    PRAGMA user_version = 2;
 ";
 
 impl Store {
-    /// Opens the database file at `path`, creating it if needed.
+    /// Opens the database file of a device at `path`, creating it if
+    /// needed.
     // `&Path` is a borrowed file path, like `const std::filesystem::path&`.
     pub fn open(path: &Path) -> Result<Store, StoreError> {
-        Store::with_connection(Connection::open(path)?)
+        Store::with_connection(Connection::open(path)?, true)
     }
 
-    /// A database in memory, gone when the Store is dropped: for tests.
+    /// A device's database in memory, gone when the Store is dropped.
     pub fn open_in_memory() -> Result<Store, StoreError> {
-        Store::with_connection(Connection::open_in_memory()?)
+        Store::with_connection(Connection::open_in_memory()?, true)
     }
 
-    fn with_connection(connection: Connection) -> Result<Store, StoreError> {
+    /// Opens a server's database: messages are kept, never decrypted.
+    pub fn open_server(path: &Path) -> Result<Store, StoreError> {
+        Store::with_connection(Connection::open(path)?, false)
+    }
+
+    fn with_connection(connection: Connection, replays: bool) -> Result<Store, StoreError> {
+        // A database of M0 or M1 (version 0, with tables) has another
+        // layout: refuse it rather than misread it.
+        let version: i64 = connection.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+        let tables: i64 =
+            connection.query_row("SELECT COUNT(*) FROM sqlite_master", [], |row| row.get(0))?;
+        if version != 2 && tables > 0 {
+            return Err(Corrupt(
+                "this database comes from an older version of Bougette: start a new one".into(),
+            )
+            .into());
+        }
         connection.execute_batch(SCHEMA)?;
         // This device's identifier: read it, or draw and keep one. The
         // last 16 hex digits of a version 7 UUID are random.
@@ -135,11 +178,19 @@ impl Store {
                 node
             }
         };
-        // Continue the clock after the latest message written.
+        // Continue the clock after the latest message held.
         let last: Option<String> =
             connection.query_row("SELECT MAX(timestamp) FROM messages", [], |row| row.get(0))?;
         let clock = Clock::new(node, last.as_deref());
-        Ok(Store { connection, clock })
+        let identity = Store::meta(&connection, "identity")?
+            .and_then(|seed| crypto::from_hex_array::<32>(&seed))
+            .map(Identity::from_seed);
+        Ok(Store {
+            connection,
+            clock,
+            identity,
+            replays,
+        })
     }
 
     /// A value of the `meta` table, if set.
@@ -170,18 +221,106 @@ impl Store {
         Ok(())
     }
 
+    /// The member this device belongs to: drawn and kept the first time.
+    fn identity(&mut self) -> Result<Identity, StoreError> {
+        if self.identity.is_none() {
+            let identity = Identity::generate();
+            self.set_setting("identity", &crypto::hex(&identity.seed()))?;
+            self.identity = Some(identity);
+        }
+        // `clone`: the caller gets its own copy, so it doesn't keep `self`
+        // borrowed (the clock and the connection are needed alongside).
+        Ok(self.identity.clone().expect("set above"))
+    }
+
+    /// This device's member identifier.
+    pub fn member(&mut self) -> Result<String, StoreError> {
+        Ok(self.identity()?.member())
+    }
+
+    /// The member's secret seed, to link another device (it gives full
+    /// access to the member's budgets: show it only on request).
+    pub fn identity_seed(&mut self) -> Result<[u8; 32], StoreError> {
+        Ok(self.identity()?.seed())
+    }
+
+    /// Makes this device one of the member's devices with `seed`. Only on
+    /// a device whose member hasn't written anything yet (it may have
+    /// received messages, e.g. when recovering).
+    pub fn adopt_identity(&mut self, seed: [u8; 32]) -> Result<(), StoreError> {
+        let written: i64 = match &self.identity {
+            Some(ours) if ours.seed() != seed => self.connection.query_row(
+                "SELECT COUNT(*) FROM messages WHERE author = ?1",
+                params![ours.member()],
+                |row| row.get(0),
+            )?,
+            _ => 0,
+        };
+        if written > 0 {
+            return Err(StoreError::NotAllowed(
+                "this device already has data: link a new one".into(),
+            ));
+        }
+        self.set_setting("identity", &crypto::hex(&seed))?;
+        self.identity = Some(Identity::from_seed(seed));
+        Ok(())
+    }
+
+    /// Proves that the device with network identifier `device` belongs to
+    /// this member: their identifier, and their signature of it.
+    pub fn prove_device(&mut self, device: &str) -> Result<(String, Vec<u8>), StoreError> {
+        let identity = self.identity()?;
+        Ok((
+            identity.member(),
+            identity.sign(device_claim(device).as_bytes()),
+        ))
+    }
+
+    /// Creates `budget` as a new budget of this member, its first Admin,
+    /// and saves it. Its identifier changes: it is derived from the
+    /// creator's key (ADR 0005), so the budget is returned.
+    pub fn create(&mut self, mut budget: Budget) -> Result<Budget, StoreError> {
+        let identity = self.identity()?;
+        let (id, origin) = access::origin(&identity);
+        budget.id = BudgetId(id);
+        let budget_id = id.to_string();
+        let number = self.new_key_number(&budget_id)?;
+        let key = self.key(&budget_id, number)?.expect("just drawn");
+        let sealed = members::seal_key(&identity.member(), &identity.receiving_key(), number, &key)
+            .expect("our own key is valid");
+        self.write(&budget_id, vec![origin, sealed])?;
+        self.save(&budget)?;
+        self.introduce(&budget_id)?;
+        Ok(budget)
+    }
+
     /// Saves `budget`: one message per field that differs from what is
-    /// stored. Entities missing from `budget` are marked deleted.
+    /// stored. Entities missing from `budget` are marked deleted. Only an
+    /// Admin or an Editor may.
     pub fn save(&mut self, budget: &Budget) -> Result<(), StoreError> {
         let budget_id = budget.id.to_string();
+        let me = self.member()?;
+        if !matches!(
+            self.access(&budget_id)?.role(&me),
+            Some(Role::Admin | Role::Editor)
+        ) {
+            return Err(StoreError::NotAllowed(
+                "only an Admin or an Editor changes a budget".into(),
+            ));
+        }
         let old = self.records(&budget_id)?;
         let new = codec::encode(budget);
 
         // The changes, in key order: new or different fields…
-        let mut changes: Vec<(Key, Option<String>)> = Vec::new();
-        for (key, value) in &new {
-            if old.get(key) != Some(value) {
-                changes.push((key.clone(), value.clone()));
+        let mut changes = Vec::new();
+        for ((entity, id, field), value) in &new {
+            if old.get(&(entity.clone(), id.clone(), field.clone())) != Some(value) {
+                changes.push(Change::new(
+                    entity.as_str(),
+                    id.as_str(),
+                    field.as_str(),
+                    value.clone(),
+                ));
             }
         }
         // …and a deletion mark for each entity that is gone.
@@ -190,110 +329,60 @@ impl Store {
             let marked = old.get(&(entity.clone(), id.clone(), DELETED.to_string()))
                 == Some(&Some("true".to_string()));
             if field == DELETED && gone && !marked {
-                changes.push((
-                    (entity.clone(), id.clone(), DELETED.to_string()),
+                changes.push(Change::new(
+                    entity.as_str(),
+                    id.as_str(),
+                    DELETED,
                     Some("true".to_string()),
                 ));
             }
         }
+        self.write(&budget_id, changes)
+    }
 
+    /// Writes `changes` to budget `budget` as messages of this member,
+    /// content encrypted with the latest key held, then rebuilds it.
+    fn write(&mut self, budget: &str, changes: Vec<Change>) -> Result<(), StoreError> {
+        if changes.is_empty() {
+            return Ok(());
+        }
+        let identity = self.identity()?;
+        let access = self.access(budget)?;
+        let keys = self.keys(budget)?;
+        // The latest announced key this device holds.
+        let current = access
+            .keys
+            .iter()
+            .rev()
+            .find_map(|number| keys.get(number).map(|key| (*number, *key)));
         // All or nothing: a SQLite transaction, committed at the end. If
         // anything fails before, `transaction` is dropped and rolls back,
         // like an RAII guard.
         let transaction = self.connection.transaction()?;
-        for ((entity, id, field), value) in changes {
-            let message = Message {
-                timestamp: self.clock.tick(),
-                budget: budget_id.clone(),
-                entity,
-                id,
-                field,
-                value,
-            };
-            apply(&transaction, &message)?;
+        for change in changes {
+            let message = Message::new(
+                &identity,
+                self.clock.tick(),
+                budget.to_string(),
+                change,
+                // `as_ref().map(...)`: borrow the key inside the Option.
+                current.as_ref().map(|(number, key)| (*number, key)),
+            )
+            .ok_or(StoreError::NoKey)?;
+            insert(&transaction, &message)?;
         }
         transaction.commit()?;
-        Ok(())
+        self.rebuild(budget)
     }
 
-    /// This store's version vector.
-    pub fn versions(&self) -> Result<Versions, StoreError> {
-        // The latest timestamp of each device: the device is what follows
-        // the 22 characters of time and counter (SQLite counts from 1).
-        let mut statement = self
-            .connection
-            .prepare("SELECT MAX(timestamp) FROM messages GROUP BY substr(timestamp, 23)")?;
-        let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
-        let mut versions = Versions::new();
-        for row in rows {
-            let timestamp = row?;
-            let node = clock::node_of(&timestamp)
-                .ok_or_else(|| Corrupt(format!("invalid timestamp {timestamp:?}")))?;
-            versions.insert(node.to_string(), timestamp);
-        }
-        Ok(versions)
-    }
-
-    /// The messages held here that a store with version vector `theirs`
-    /// lacks, oldest first.
-    pub fn missing_for(&self, theirs: &Versions) -> Result<Vec<Message>, StoreError> {
-        let mut statement = self.connection.prepare(
-            "SELECT timestamp, budget, entity, id, field, value
-             FROM messages ORDER BY timestamp",
-        )?;
-        let rows = statement.query_map([], |row| {
-            Ok(Message {
-                timestamp: row.get(0)?,
-                budget: row.get(1)?,
-                entity: row.get(2)?,
-                id: row.get(3)?,
-                field: row.get(4)?,
-                value: row.get(5)?,
-            })
-        })?;
-        let mut missing = Vec::new();
-        for row in rows {
-            let message = row?;
-            // Missing if they have nothing from its device, or only older
-            // messages. `is_none_or` is true for `None`, else the test.
-            let node = clock::node_of(&message.timestamp).unwrap_or_default();
-            if theirs
-                .get(node)
-                .is_none_or(|latest| message.timestamp > *latest)
-            {
-                missing.push(message);
-            }
-        }
-        Ok(missing)
-    }
-
-    /// Records messages from another device, all or nothing, and returns
-    /// how many were new. Fails on a malformed timestamp.
-    pub fn receive(&mut self, messages: &[Message]) -> Result<usize, StoreError> {
-        let transaction = self.connection.transaction()?;
-        let mut new = 0;
-        for message in messages {
-            if clock::parse(&message.timestamp).is_none() {
-                return Err(Corrupt(format!("invalid timestamp {:?}", message.timestamp)).into());
-            }
-            if apply(&transaction, message)? {
-                new += 1;
-            }
-        }
-        transaction.commit()?;
-        // Only once committed: our next changes must sort after theirs.
-        for message in messages {
-            self.clock.observe(&message.timestamp);
-        }
-        Ok(new)
-    }
-
-    /// The budget `id` as currently stored, `None` if unknown or deleted.
+    /// The budget `id` as currently stored, `None` if unknown, deleted, or
+    /// not readable by this device.
     pub fn load(&self, id: BudgetId) -> Result<Option<Budget>, StoreError> {
         Ok(codec::decode(&self.records(&id.to_string())?)?)
     }
 
-    /// The stored budgets that aren't deleted: identifier and name.
+    /// The budgets this device can read and that aren't deleted:
+    /// identifier and name.
     pub fn budgets(&self) -> Result<Vec<(BudgetId, String)>, StoreError> {
         let mut statement = self.connection.prepare(
             "SELECT id, value FROM fields
@@ -319,11 +408,248 @@ impl Store {
         Ok(budgets)
     }
 
-    /// Every stored field of budget `budget`.
-    fn records(&self, budget: &str) -> Result<Records, StoreError> {
+    /// Every budget this store has messages of, readable or not.
+    pub fn budget_ids(&self) -> Result<Vec<String>, StoreError> {
         let mut statement = self
             .connection
-            .prepare("SELECT entity, id, field, value FROM fields WHERE budget = ?1")?;
+            .prepare("SELECT DISTINCT budget FROM messages ORDER BY budget")?;
+        let rows = statement.query_map([], |row| row.get(0))?;
+        // Collecting an iterator of `Result`s into a `Result<Vec<_>, _>`:
+        // the first error stops it.
+        Ok(rows.collect::<Result<Vec<String>, _>>()?)
+    }
+
+    /// The access of budget `budget`, as of all its access changes held.
+    pub fn access(&self, budget: &str) -> Result<Access, StoreError> {
+        let mut access = Access::default();
+        for message in self.messages_where("budget = ?1 AND key IS NULL", &[budget])? {
+            if let Body::Clear(change) = &message.body {
+                access.apply(budget, &message.author, &message.timestamp, change);
+            }
+        }
+        Ok(access)
+    }
+
+    /// This store's version vector.
+    pub fn versions(&self) -> Result<Versions, StoreError> {
+        // The latest timestamp of each budget and device: the device is
+        // what follows the 22 characters of time and counter (SQLite
+        // counts from 1).
+        let mut statement = self.connection.prepare(
+            "SELECT budget, MAX(timestamp) FROM messages
+             GROUP BY budget, substr(timestamp, 23)",
+        )?;
+        let rows = statement.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?;
+        let mut versions = Versions::new();
+        for row in rows {
+            let (budget, timestamp) = row?;
+            let node = clock::node_of(&timestamp)
+                .ok_or_else(|| Corrupt(format!("invalid timestamp {timestamp:?}")))?;
+            versions.insert((budget, node.to_string()), timestamp);
+        }
+        Ok(versions)
+    }
+
+    /// The messages of the budgets `allowed` keeps that a store with
+    /// version vector `theirs` lacks, oldest first.
+    pub fn missing_for(
+        &self,
+        theirs: &Versions,
+        allowed: impl Fn(&str) -> bool,
+    ) -> Result<Vec<Message>, StoreError> {
+        let mut missing = Vec::new();
+        for message in self.messages_where("1", &[])? {
+            if !allowed(&message.budget) {
+                continue;
+            }
+            // Missing if they have nothing from its budget and device, or
+            // only older messages. `is_none_or` is true for `None`, else
+            // the test.
+            let node = clock::node_of(&message.timestamp).unwrap_or_default();
+            let key = (message.budget.clone(), node.to_string());
+            if theirs
+                .get(&key)
+                .is_none_or(|latest| message.timestamp > *latest)
+            {
+                missing.push(message);
+            }
+        }
+        Ok(missing)
+    }
+
+    /// Records messages from another device, all or nothing, and returns
+    /// how many were new. Fails on a malformed or forged message. On a
+    /// device, the budgets concerned are then rebuilt, and this member
+    /// follows up as needed (new members, new keys: see `members`).
+    pub fn receive(&mut self, messages: &[Message]) -> Result<usize, StoreError> {
+        for message in messages {
+            if clock::parse(&message.timestamp).is_none() || !message.is_authentic() {
+                return Err(Corrupt(format!("invalid message {:?}", message.timestamp)).into());
+            }
+        }
+        let transaction = self.connection.transaction()?;
+        let mut new = 0;
+        for message in messages {
+            if insert(&transaction, message)? {
+                new += 1;
+            }
+        }
+        transaction.commit()?;
+        // Only once committed: our next changes must sort after theirs.
+        for message in messages {
+            self.clock.observe(&message.timestamp);
+        }
+        // A `BTreeSet` of the budgets concerned: each once, in order.
+        let budgets: BTreeSet<&str> = messages.iter().map(|m| m.budget.as_str()).collect();
+        for budget in budgets {
+            self.rebuild(budget)?;
+            self.follow_up(budget)?;
+        }
+        Ok(new)
+    }
+
+    /// Rebuilds the fields of budget `budget` from its messages: opens the
+    /// budget keys sealed for this member, then replays every message in
+    /// timestamp order, keeping the content changes whose author was
+    /// allowed to make them at the time.
+    fn rebuild(&mut self, budget: &str) -> Result<(), StoreError> {
+        if !self.replays {
+            return Ok(());
+        }
+        let messages = self.messages_where("budget = ?1", &[budget])?;
+        // First pass: the keys sealed for us.
+        if let Some(identity) = &self.identity {
+            let me = identity.member();
+            let access = self.access(budget)?;
+            let known = self.keys(budget)?;
+            for ((member, number), sealed) in &access.sealed {
+                if *member != me || known.contains_key(number) {
+                    continue;
+                }
+                let key = identity
+                    .open(sealed)
+                    .and_then(|key| <[u8; 32]>::try_from(key).ok());
+                if let Some(key) = key {
+                    self.add_key(budget, *number, &key)?;
+                }
+            }
+        }
+        // Second pass: everything, in order.
+        let keys = self.keys(budget)?;
+        let transaction = self.connection.transaction()?;
+        transaction.execute("DELETE FROM fields WHERE budget = ?1", params![budget])?;
+        let mut access = Access::default();
+        for message in &messages {
+            if let Body::Clear(change) = &message.body {
+                access.apply(budget, &message.author, &message.timestamp, change);
+                continue;
+            }
+            // `copied` turns the `Option<&[u8; 32]>` into an owned copy.
+            let Some(change) = message.change(|number| keys.get(&number).copied()) else {
+                continue; // no key for it (yet)
+            };
+            if !access.may_write(&message.author, &change) {
+                continue;
+            }
+            // In timestamp order, so a later change of a field replaces
+            // the earlier one: "the latest change wins".
+            transaction.execute(
+                "INSERT OR REPLACE INTO fields
+                 (budget, entity, id, field, value, timestamp, author)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                params![
+                    budget,
+                    change.entity,
+                    change.id,
+                    change.field,
+                    change.value,
+                    message.timestamp,
+                    message.author
+                ],
+            )?;
+        }
+        transaction.commit()?;
+        Ok(())
+    }
+
+    /// The messages matching the SQL condition `filter`, with `?1`, `?2`...
+    /// bound to `values`, in timestamp order.
+    fn messages_where(&self, filter: &str, values: &[&str]) -> Result<Vec<Message>, StoreError> {
+        let mut statement = self.connection.prepare(&format!(
+            "SELECT timestamp, budget, author, key, body, signature
+             FROM messages WHERE {filter} ORDER BY timestamp"
+        ))?;
+        // `params_from_iter` binds the values of a list, however many.
+        let rows = statement.query_map(rusqlite::params_from_iter(values), |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, Option<u32>>(3)?,
+                row.get::<_, Vec<u8>>(4)?,
+                row.get::<_, Vec<u8>>(5)?,
+            ))
+        })?;
+        let mut messages = Vec::new();
+        for row in rows {
+            let (timestamp, budget, author, key, body, signature) = row?;
+            let body = Message::body_from(key, body)
+                .ok_or_else(|| Corrupt(format!("invalid message {timestamp:?}")))?;
+            messages.push(Message {
+                timestamp,
+                budget,
+                author,
+                body,
+                signature,
+            });
+        }
+        Ok(messages)
+    }
+
+    /// The budget keys of `budget` this device holds, by number.
+    fn keys(&self, budget: &str) -> Result<BTreeMap<u32, [u8; 32]>, StoreError> {
+        let mut statement = self
+            .connection
+            .prepare("SELECT number, key FROM keys WHERE budget = ?1")?;
+        let rows = statement.query_map(params![budget], |row| {
+            Ok((row.get::<_, u32>(0)?, row.get::<_, Vec<u8>>(1)?))
+        })?;
+        let mut keys = BTreeMap::new();
+        for row in rows {
+            let (number, key) = row?;
+            let key = <[u8; 32]>::try_from(key).map_err(|_| Corrupt("invalid key".into()))?;
+            keys.insert(number, key);
+        }
+        Ok(keys)
+    }
+
+    fn key(&self, budget: &str, number: u32) -> Result<Option<[u8; 32]>, StoreError> {
+        Ok(self.keys(budget)?.get(&number).copied())
+    }
+
+    fn add_key(&self, budget: &str, number: u32, key: &[u8; 32]) -> Result<(), StoreError> {
+        self.connection.execute(
+            "INSERT OR IGNORE INTO keys (budget, number, key) VALUES (?1, ?2, ?3)",
+            params![budget, number, key.as_slice()],
+        )?;
+        Ok(())
+    }
+
+    /// Draws a new key for `budget`, keeps it, and returns its number.
+    fn new_key_number(&self, budget: &str) -> Result<u32, StoreError> {
+        let number = u32::from_be_bytes(crypto::random());
+        self.add_key(budget, number, &crypto::random())?;
+        Ok(number)
+    }
+
+    /// Every stored field of budget `budget`, members' names excepted.
+    fn records(&self, budget: &str) -> Result<Records, StoreError> {
+        let mut statement = self.connection.prepare(
+            "SELECT entity, id, field, value FROM fields
+             WHERE budget = ?1 AND entity != 'member'",
+        )?;
         let rows = statement.query_map(params![budget], |row| {
             Ok(((row.get(0)?, row.get(1)?, row.get(2)?), row.get(3)?))
         })?;
@@ -336,39 +662,33 @@ impl Store {
     }
 }
 
-/// Records one message in the log and, if it is the latest change of its
-/// field, makes it the field's current value; returns whether the message
-/// was new. Applying the same message twice, or messages in any order,
-/// gives the same result: that's what lets devices exchange them freely.
-fn apply(connection: &Connection, message: &Message) -> Result<bool, StoreError> {
-    // Destructure the message into its fields, borrowed.
-    let Message {
-        timestamp,
-        budget,
-        entity,
-        id,
-        field,
-        value,
-    } = message;
+/// Whether `proof` shows that the device `device` belongs to `member`.
+pub fn device_belongs(member: &str, device: &str, proof: &[u8]) -> bool {
+    crypto::verify(member, device_claim(device).as_bytes(), proof)
+}
+
+/// What a member signs to claim a device.
+fn device_claim(device: &str) -> String {
+    format!("bougette device {device}")
+}
+
+/// Records one message in the log; returns whether it was new.
+fn insert(connection: &Connection, message: &Message) -> Result<bool, StoreError> {
+    let (key, body) = message.stored_body();
     // `execute` returns the number of rows changed: 0 if already there.
     let inserted = connection.execute(
-        "INSERT OR IGNORE INTO messages (timestamp, budget, entity, id, field, value)
+        "INSERT OR IGNORE INTO messages (timestamp, budget, author, key, body, signature)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![timestamp, budget, entity, id, field, value],
+        params![
+            message.timestamp,
+            message.budget,
+            message.author,
+            key,
+            body,
+            message.signature
+        ],
     )?;
-    if inserted == 0 {
-        return Ok(false);
-    }
-    // Insert the field, or update it only if this message is newer.
-    connection.execute(
-        "INSERT INTO fields (budget, entity, id, field, value, timestamp)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
-         ON CONFLICT (budget, entity, id, field) DO UPDATE
-         SET value = excluded.value, timestamp = excluded.timestamp
-         WHERE excluded.timestamp > fields.timestamp",
-        params![budget, entity, id, field, value, timestamp],
-    )?;
-    Ok(true)
+    Ok(inserted > 0)
 }
 
 #[cfg(test)]
@@ -455,11 +775,25 @@ mod tests {
             .unwrap()
     }
 
+    /// Sends `from` what `to` lacks; returns how many messages were new.
+    fn send(from: &Store, to: &mut Store) -> usize {
+        let missing = from.missing_for(&to.versions().unwrap(), |_| true).unwrap();
+        to.receive(&missing).unwrap()
+    }
+
+    /// A second device of the member of `store`.
+    fn other_device(store: &mut Store) -> Store {
+        let mut device = Store::open_in_memory().unwrap();
+        device
+            .adopt_identity(store.identity_seed().unwrap())
+            .unwrap();
+        device
+    }
+
     #[test]
     fn a_saved_budget_loads_back_identical() {
         let mut store = Store::open_in_memory().unwrap();
-        let budget = sample();
-        store.save(&budget).unwrap();
+        let budget = store.create(sample()).unwrap();
         assert_eq!(store.load(budget.id).unwrap(), Some(budget.clone()));
         assert_eq!(
             store.budgets().unwrap(),
@@ -470,8 +804,7 @@ mod tests {
     #[test]
     fn saving_again_writes_only_what_changed() {
         let mut store = Store::open_in_memory().unwrap();
-        let mut budget = sample();
-        store.save(&budget).unwrap();
+        let mut budget = store.create(sample()).unwrap();
         let before = message_count(&store);
 
         // Saving the same budget writes nothing.
@@ -488,8 +821,7 @@ mod tests {
     #[test]
     fn a_revision_replaced_by_an_earlier_change_is_deleted() {
         let mut store = Store::open_in_memory().unwrap();
-        let mut budget = sample();
-        store.save(&budget).unwrap();
+        let mut budget = store.create(sample()).unwrap();
         // A change from April replaces the July revision of the rent.
         let rent_id = budget.lines()[0].id;
         budget
@@ -514,13 +846,12 @@ mod tests {
     fn survives_closing_and_reopening_the_file() {
         // A file in the system's temporary directory, removed at the end.
         let path = std::env::temp_dir().join(format!("bougette-test-{}.sqlite", Uuid::now_v7()));
-        let budget = sample();
-        {
+        let budget = {
             // An inner block: `store` is dropped (the file closed) at `}`,
             // like a C++ destructor at the end of a scope.
             let mut store = Store::open(&path).unwrap();
-            store.save(&budget).unwrap();
-        }
+            store.create(sample()).unwrap()
+        };
         let mut store = Store::open(&path).unwrap();
         assert_eq!(store.load(budget.id).unwrap(), Some(budget.clone()));
         // The clock goes on after the stored messages: a new change sorts
@@ -534,48 +865,41 @@ mod tests {
     }
 
     #[test]
-    fn the_latest_change_of_a_field_wins_whatever_the_order() {
-        let store = Store::open_in_memory().unwrap();
-        let connection = &store.connection;
-        let rename = |timestamp: &str, name: &str| Message {
-            timestamp: timestamp.to_string(),
-            budget: "b".to_string(),
-            entity: "budget".to_string(),
-            id: "b".to_string(),
-            field: "name".to_string(),
-            value: Some(name.to_string()),
-        };
-        // Two messages for the same field, applied newest first, and the
-        // newest one twice.
-        assert!(apply(connection, &rename("2", "New")).unwrap());
-        assert!(apply(connection, &rename("1", "Old")).unwrap());
-        assert!(!apply(connection, &rename("2", "New")).unwrap());
-        let name: String = connection
-            .query_row("SELECT value FROM fields WHERE field = 'name'", [], |row| {
-                row.get(0)
-            })
+    fn refuses_a_database_of_an_older_version() {
+        let connection = Connection::open_in_memory().unwrap();
+        connection
+            .execute_batch("CREATE TABLE messages (timestamp TEXT)")
             .unwrap();
-        assert_eq!(name, "New");
-    }
-
-    /// Sends `from` what `to` lacks; returns how many messages were new.
-    fn sync(from: &Store, to: &mut Store) -> usize {
-        let missing = from.missing_for(&to.versions().unwrap()).unwrap();
-        to.receive(&missing).unwrap()
+        assert!(matches!(
+            Store::with_connection(connection, true),
+            Err(StoreError::Corrupt(_))
+        ));
     }
 
     #[test]
-    fn two_devices_converge() {
+    fn the_latest_change_of_a_field_wins_whatever_the_order() {
         let mut laptop = Store::open_in_memory().unwrap();
-        let mut phone = Store::open_in_memory().unwrap();
-        let mut budget = sample();
+        let mut phone = other_device(&mut laptop);
+        let mut budget = laptop.create(Budget::new("Old", Currency::EUR)).unwrap();
+        budget.name = "New".to_string();
         laptop.save(&budget).unwrap();
-        let sent = sync(&laptop, &mut phone);
-        assert!(sent > 0);
+        // The phone receives the laptop's messages newest first.
+        let mut messages = laptop.missing_for(&Versions::new(), |_| true).unwrap();
+        messages.reverse();
+        phone.receive(&messages).unwrap();
+        assert_eq!(phone.load(budget.id).unwrap().unwrap().name, "New");
+    }
+
+    #[test]
+    fn two_devices_of_a_member_converge() {
+        let mut laptop = Store::open_in_memory().unwrap();
+        let mut phone = other_device(&mut laptop);
+        let mut budget = laptop.create(sample()).unwrap();
+        assert!(send(&laptop, &mut phone) > 0);
         assert_eq!(phone.load(budget.id).unwrap(), Some(budget.clone()));
         // Nothing left to send either way.
-        assert_eq!(sync(&laptop, &mut phone), 0);
-        assert_eq!(sync(&phone, &mut laptop), 0);
+        assert_eq!(send(&laptop, &mut phone), 0);
+        assert_eq!(send(&phone, &mut laptop), 0);
 
         // Both rename the budget offline. The two changes are concurrent:
         // the one with the greater timestamp wins, which may be either
@@ -586,8 +910,8 @@ mod tests {
         let mut on_phone = phone.load(budget.id).unwrap().unwrap();
         on_phone.name = "From the phone".to_string();
         phone.save(&on_phone).unwrap();
-        assert_eq!(sync(&phone, &mut laptop), 1);
-        assert_eq!(sync(&laptop, &mut phone), 1);
+        assert_eq!(send(&phone, &mut laptop), 1);
+        assert_eq!(send(&laptop, &mut phone), 1);
         let on_laptop = laptop.load(budget.id).unwrap().unwrap();
         assert_eq!(phone.load(budget.id).unwrap(), Some(on_laptop.clone()));
         assert!(["From the laptop", "From the phone"].contains(&on_laptop.name.as_str()));
@@ -595,20 +919,35 @@ mod tests {
     }
 
     #[test]
-    fn refuses_malformed_timestamps() {
-        let mut store = Store::open_in_memory().unwrap();
-        let message = Message {
-            timestamp: "yesterday".to_string(),
-            budget: "b".to_string(),
-            entity: "budget".to_string(),
-            id: "b".to_string(),
-            field: "name".to_string(),
-            value: None,
-        };
+    fn refuses_forged_messages() {
+        let mut alice = Store::open_in_memory().unwrap();
+        let budget = alice.create(sample()).unwrap();
+        let mut messages = alice.missing_for(&Versions::new(), |_| true).unwrap();
+        messages[0].author = Store::open_in_memory().unwrap().member().unwrap();
+        let mut other = Store::open_in_memory().unwrap();
         assert!(matches!(
-            store.receive(&[message]),
+            other.receive(&messages),
             Err(StoreError::Corrupt(_))
         ));
-        assert!(store.versions().unwrap().is_empty());
+        assert!(other.versions().unwrap().is_empty());
+        assert!(other.load(budget.id).unwrap().is_none());
+    }
+
+    #[test]
+    fn a_server_keeps_messages_it_cannot_read() {
+        let mut alice = Store::open_in_memory().unwrap();
+        let budget = alice.create(sample()).unwrap();
+        let path = std::env::temp_dir().join(format!("bougette-test-{}.sqlite", Uuid::now_v7()));
+        let mut server = Store::open_server(&path).unwrap();
+        assert!(send(&alice, &mut server) > 0);
+        assert!(server.load(budget.id).unwrap().is_none());
+        // It reads the access, though: Alice is the Admin.
+        let access = server.access(&budget.id.to_string()).unwrap();
+        assert_eq!(access.role(&alice.member().unwrap()), Some(Role::Admin));
+        // And it passes everything on to Alice's other device.
+        let mut phone = other_device(&mut alice);
+        send(&server, &mut phone);
+        assert_eq!(phone.load(budget.id).unwrap(), Some(budget));
+        std::fs::remove_file(&path).unwrap();
     }
 }

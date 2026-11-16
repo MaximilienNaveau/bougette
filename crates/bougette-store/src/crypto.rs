@@ -53,6 +53,7 @@ pub fn hmac(key: &[u8], data: &[u8]) -> [u8; 32] {
 
 /// A member's keys, all derived from one secret seed: the seed is what
 /// moves to the member's other devices and into the encrypted backup.
+#[derive(Clone)]
 pub struct Identity {
     seed: [u8; 32],
     signing: SigningKey,
