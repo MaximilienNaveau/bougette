@@ -573,8 +573,10 @@ mod tests {
         assert_eq!(sync(&laptop, &mut phone), 0);
         assert_eq!(sync(&phone, &mut laptop), 0);
 
-        // Both rename the budget offline; the phone renames it later, so
-        // its name wins on both once they sync both ways.
+        // Both rename the budget offline. The two changes are concurrent:
+        // the one with the greater timestamp wins, which may be either
+        // (same millisecond and counter: the device identifiers, drawn at
+        // random, break the tie). Whichever it is, both end up with it.
         budget.name = "From the laptop".to_string();
         laptop.save(&budget).unwrap();
         let mut on_phone = phone.load(budget.id).unwrap().unwrap();
@@ -582,8 +584,9 @@ mod tests {
         phone.save(&on_phone).unwrap();
         assert_eq!(sync(&phone, &mut laptop), 1);
         assert_eq!(sync(&laptop, &mut phone), 1);
-        assert_eq!(laptop.load(budget.id).unwrap(), Some(on_phone.clone()));
-        assert_eq!(phone.load(budget.id).unwrap(), Some(on_phone));
+        let on_laptop = laptop.load(budget.id).unwrap().unwrap();
+        assert_eq!(phone.load(budget.id).unwrap(), Some(on_laptop.clone()));
+        assert!(["From the laptop", "From the phone"].contains(&on_laptop.name.as_str()));
         assert_eq!(laptop.versions().unwrap(), phone.versions().unwrap());
     }
 
