@@ -18,6 +18,7 @@
 //! thread. Unlike C++20 coroutines, Rust ships no scheduler: a runtime
 //! (here tokio) drives the futures. There is no direct C++ equivalent.
 
+pub mod net;
 mod wire;
 
 use std::sync::{Mutex, MutexGuard, PoisonError};
@@ -34,6 +35,10 @@ pub enum SyncError {
     Store(StoreError),
     /// The peer sent something that isn't the protocol.
     Protocol(String),
+    /// The network layer failed: no route to the peer, refused handshake...
+    Network(String),
+    /// A device that isn't allowed to sync with us tried to.
+    NotAllowed(String),
 }
 
 impl From<std::io::Error> for SyncError {

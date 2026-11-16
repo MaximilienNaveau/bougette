@@ -8,6 +8,10 @@ repository.workspace = true
 
 [dependencies]
 bougette-store = { path = "../bougette-store" }
+# The transport (ADR 0001): QUIC between devices addressed by public key.
+# Only "tls-ring" (TLS with ring, all Rust or portable C): no metrics, no
+# UPnP port mapping. Licence: MIT OR Apache-2.0.
+iroh = { version = "1.4", default-features = false, features = ["tls-ring"] }
 # Async I/O: the traits for byte streams (AsyncRead, AsyncWrite) and their
 # helpers (read_u32, write_all...). iroh runs on tokio too. Licence: MIT.
 tokio = { version = "1.54", features = ["io-util"] }
