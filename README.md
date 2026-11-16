@@ -1,6 +1,7 @@
 # Bougette
 
-> Early stage: research and design, no app yet.
+> Early stage: a command-line client on one computer, no sync and no
+> graphical app yet.
 
 *Bougette* is the Old French word for a small leather purse, and the
 origin of the English word *budget*.
@@ -17,6 +18,19 @@ from source.
 
 ## Status
 
+The domain and its storage work, behind a command-line client (milestone
+M0 of [doc/scope.md](doc/scope.md)):
+
+```sh
+nix run . -- help
+nix run . -- budget new Household
+nix run . -- line add Household Rent Housing cost 900 monthly 2026-01-05
+nix run . -- tx add Household 2026-11-05 cost 950 Housing --line Rent
+nix run . -- show Household
+```
+
+- [doc/scope.md](doc/scope.md): what v1 does and the milestones (French).
+- [GLOSSARY.md](GLOSSARY.md): the domain's words.
 - [doc/README.md](doc/README.md): the initial idea (French).
 - [doc/research/](doc/research/): technology research (French): UI
   framework, local database, sync, encryption, distribution.

@@ -61,6 +61,32 @@
           };
       in
       {
+        # `nix build` / `nix run . -- help`: the `bougette` command-line
+        # client.
+        packages.default = pkgs.rustPlatform.buildRustPackage {
+          pname = "bougette";
+          version = "0.1.0";
+          src = rustSrc;
+          cargoLock.lockFile = ./Cargo.lock;
+          cargoBuildFlags = [
+            "--package"
+            "bougette-cli"
+          ];
+          # The tests run in `checks.tests`.
+          doCheck = false;
+          # SQLite from its bundled source, as in `cargoCheck` above (a
+          # setup hook sets the variable, so override it just before).
+          preBuild = "export LIBSQLITE3_SYS_USE_PKG_CONFIG=0";
+          meta = {
+            description = "Command-line client of Bougette, a local-first budget app";
+            license = with pkgs.lib.licenses; [
+              mit
+              asl20
+            ];
+            mainProgram = "bougette";
+          };
+        };
+
         # `nix develop`: the Rust toolchain from nixpkgs, pinned by
         # flake.lock. Flutter and the Android targets come with the first
         # UI code.
