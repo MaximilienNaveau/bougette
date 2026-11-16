@@ -72,13 +72,13 @@ Chaque jalon est utilisable et testé seul.
 2. **M1 : synchronisation**
    - deux appareils d'un même membre convergent : directement par iroh, puis via `bougette-server` qui joue la boîte aux lettres ;
    - HLC, la modification la plus récente gagne, vecteur de versions ([ADR 0004](adr/0004-vecteur-de-versions-plutot-que-merkle.md)) ;
-   - en attendant M2, un appareil qui sert (`bougette serve`, `bougette-server`) n'accepte que les identifiants d'appareils listés (`--allow`) ;
    - l'adresse d'un pair se donne à la main (`ID@IP:PORT`) ; la découverte sur le réseau local (mDNS) et le QR code viendront avec l'interface.
-3. **M2 : membres et chiffrement**
+3. **M2 : membres et chiffrement** ([ADR 0005](adr/0005-chiffrement-signatures-et-acces.md))
    - clés par budget, invitations, rôles ;
-   - budget partagé avec versements et avances reflétés ;
+   - budget partagé avec versements et avances reflétés dans le budget personnel du membre (payeur ou bénéficiaire d'une opération) ;
    - phrase de récupération ;
-   - outils en ligne de commande du serveur.
+   - outils en ligne de commande du serveur ;
+   - restent pour la v1 : les notifications internes, la corbeille, l'archivage et la suppression d'un budget, l'affichage de l'auteur et de la dernière modification, les équilibrages directs entre membres, la découverte en réseau local et le QR code.
 4. **M3 : interface Linux** : Flutter sur le même cœur, vue calendrier et couleurs.
 
 Viennent ensuite : Android, Windows, le NAS puis datcat.fr, et F-Droid/nixpkgs.

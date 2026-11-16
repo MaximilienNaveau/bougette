@@ -1,7 +1,7 @@
 # Bougette
 
-> Early stage: a command-line client and a server that sync a member's
-> devices; no shared budgets, encryption or graphical app yet.
+> Early stage: a command-line client and a server, with shared,
+> end-to-end encrypted budgets; no graphical app yet.
 
 *Bougette* is the Old French word for a small leather purse, and the
 origin of the English word *budget*.
@@ -29,14 +29,23 @@ nix run . -- tx add Household 2026-11-05 cost 950 Housing --line Rent
 nix run . -- show Household
 ```
 
-A member's devices sync over [iroh](https://www.iroh.computer/), directly
-or through a server that keeps changes for devices that are offline
-(milestone M1):
+Members share budgets through a server that keeps their changes,
+encrypted end to end: it can't read the budgets (milestones M1 and M2,
+[ADR 0005](doc/adr/0005-chiffrement-signatures-et-acces.md)). Devices talk
+over [iroh](https://www.iroh.computer/):
 
 ```sh
-nix run . -- id                    # on each device: its identifier
-nix run .#server -- --db server.sqlite --port 47210 --allow ID1,ID2
-nix run . -- sync ADDRESS          # on each device, ADDRESS as printed
+# The server's operator lets Alice in.
+nix run .#server -- --db server.sqlite invite alice      # prints TOKEN
+nix run .#server -- --db server.sqlite serve --port 47210  # prints ADDRESS
+# Alice joins, creates a budget, invites Bob, sets up her recovery phrase.
+nix run . -- server join ADDRESS TOKEN alice
+nix run . -- budget new Household
+nix run . -- invite Household                            # prints INVITATION
+nix run . -- recovery setup
+# Bob asks to join; Alice's device lets him in at its next sync.
+nix run . -- accept INVITATION --username bob
+nix run . -- sync
 ```
 
 - [doc/scope.md](doc/scope.md): what v1 does and the milestones (French).
