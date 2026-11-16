@@ -1,0 +1,31 @@
+[package]
+name = "bougette-cli"
+description = "Bougette's command-line client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# The executable is called `bougette`, not `bougette-cli` (like
+# add_executable(bougette ...) in CMake).
+[[bin]]
+name = "bougette"
+path = "src/main.rs"
+
+[dependencies]
+bougette-core = { path = "../bougette-core" }
+bougette-store = { path = "../bougette-store" }
+bougette-sync = { path = "../bougette-sync" }
+# The identifiers and addresses of devices, for the network commands.
+iroh = { version = "1.4", default-features = false, features = ["tls-ring"] }
+# Dates, plus the system time zone to know today's date where the user is:
+# "tz-system" finds the zone, "tzdb-zoneinfo" reads its rules from
+# /usr/share/zoneinfo. No time zone data is bundled.
+jiff = { version = "0.2", default-features = false, features = [
+    "std",
+    "tz-system",
+    "tzdb-zoneinfo",
+] }
+# The async runtime that drives the network commands, on the main thread
+# ("rt"), with sockets ("net") and timers ("time") for iroh.
+tokio = { version = "1.54", features = ["rt", "net", "time"] }

@@ -35,7 +35,7 @@ Décisions de périmètre prises pendant la séance de cadrage des 14 et 15 nove
 - **Modifications concurrentes** : la plus récente gagne, champ par champ. Quand un montant est écrasé, l'app le signale par une notification interne (cloche avec pastille ou compteur, et historique des notifications).
 - **Corbeille** par budget : lignes et opérations supprimées restaurables pendant 30 jours par un Éditeur.
 - **Remboursements** : opération négative dans une catégorie de dépense.
-- **Couleurs prévu/réel**, par poste et dans le calendrier :
+- **Couleurs prévu/réel**, par poste et dans le calendrier, pour les dépenses seulement (pas de couleur sur les revenus en v1) :
   - vert : sous le prévu ;
   - jaune ou orange : proche du prévu (au moins 90 %, seuil fixe en v1) ;
   - rouge : dépassement, avec le montant réel affiché.
@@ -71,12 +71,14 @@ Chaque jalon est utilisable et testé seul.
    - pas de réseau.
 2. **M1 : synchronisation**
    - deux appareils d'un même membre convergent : directement par iroh, puis via `bougette-server` qui joue la boîte aux lettres ;
-   - HLC, la modification la plus récente gagne, Merkle.
-3. **M2 : membres et chiffrement**
+   - HLC, la modification la plus récente gagne, vecteur de versions ([ADR 0004](adr/0004-vecteur-de-versions-plutot-que-merkle.md)) ;
+   - l'adresse d'un pair se donne à la main (`ID@IP:PORT`) ; la découverte sur le réseau local (mDNS) et le QR code viendront avec l'interface.
+3. **M2 : membres et chiffrement** ([ADR 0005](adr/0005-chiffrement-signatures-et-acces.md))
    - clés par budget, invitations, rôles ;
-   - budget partagé avec versements et avances reflétés ;
+   - budget partagé avec versements et avances reflétés dans le budget personnel du membre (payeur ou bénéficiaire d'une opération) ;
    - phrase de récupération ;
-   - outils en ligne de commande du serveur.
+   - outils en ligne de commande du serveur ;
+   - restent pour la v1 : les notifications internes, la corbeille, l'archivage et la suppression d'un budget, l'affichage de l'auteur et de la dernière modification, les équilibrages directs entre membres, la découverte en réseau local et le QR code.
 4. **M3 : interface Linux** : Flutter sur le même cœur, vue calendrier et couleurs.
 
 Viennent ensuite : Android, Windows, le NAS puis datcat.fr, et F-Droid/nixpkgs.

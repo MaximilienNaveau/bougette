@@ -1,6 +1,6 @@
 # Transport : iroh, avec le serveur comme pair toujours en ligne
 
-Les appareils se synchronisent via [iroh](https://github.com/n0-computer/iroh) (QUIC adressé par clé publique) : directement entre eux sur le réseau local (mDNS) ou à travers Internet (hole punching, sinon relais `iroh-relay` auto-hébergé). Le relais iroh ne stocke rien. `bougette-server` est donc lui-même un **pair iroh toujours en ligne** qui garde les messages chiffrés pour les appareils hors ligne et vérifie l'appartenance aux budgets par clé d'appareil. Il ne voit jamais les données en clair. La logique de synchronisation (horloge HLC, fusion LWW, Merkle, chiffrement par budget) ne dépend pas du transport : elle passe par un trait `Transport`.
+Les appareils se synchronisent via [iroh](https://github.com/n0-computer/iroh) (QUIC adressé par clé publique) : directement entre eux sur le réseau local (mDNS) ou à travers Internet (hole punching, sinon relais `iroh-relay` auto-hébergé). Le relais iroh ne stocke rien. `bougette-server` est donc lui-même un **pair iroh toujours en ligne** qui garde les messages chiffrés pour les appareils hors ligne et vérifie l'appartenance aux budgets par clé d'appareil. Il ne voit jamais les données en clair. La logique de synchronisation (horloge HLC, fusion LWW, vecteur de versions depuis l'[ADR 0004](0004-vecteur-de-versions-plutot-que-merkle.md), chiffrement par budget) ne dépend pas du transport : elle passe par un trait `Transport`.
 
 ## Options considérées
 

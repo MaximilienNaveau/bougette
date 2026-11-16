@@ -1,0 +1,18 @@
+[package]
+name = "bougette-server"
+description = "Bougette's server: an always-online device that keeps and passes on changes"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# No direct dependency on bougette-core: the server keeps and passes on
+# messages, it never reads budgets (and can't: they are encrypted).
+[dependencies]
+bougette-store = { path = "../bougette-store" }
+bougette-sync = { path = "../bougette-sync" }
+# The device registry, in the same database file as the messages.
+rusqlite = { version = "0.43", features = ["bundled"] }
+# The device identifiers of the connections (iroh's public keys).
+iroh = { version = "1.4", default-features = false, features = ["tls-ring"] }
+tokio = { version = "1.54", features = ["rt", "net", "time"] }

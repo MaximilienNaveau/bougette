@@ -1,0 +1,20 @@
+[package]
+name = "bougette-core"
+description = "Bougette's domain logic: budgets, lines, schedules, money"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# Calendar dates without time or time zone (jiff::civil::Date), with
+# month arithmetic that clamps the 31st to the end of shorter months.
+# Licence: Unlicense OR MIT.
+# No default features: they bring time zones and their database, which
+# calendar dates don't need.
+jiff = { version = "0.2", default-features = false, features = ["std"] }
+# Identifiers for lines and transactions that stay unique across devices,
+# so changes made offline on two devices never collide (M1 sync). Version
+# 7 UUIDs start with a timestamp, so they sort by creation time.
+# Licence: Apache-2.0 OR MIT.
+uuid = { version = "1.29", features = ["v7"] }
