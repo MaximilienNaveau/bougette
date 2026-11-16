@@ -1,7 +1,7 @@
 # Bougette
 
-> Early stage: a command-line client on one computer, no sync and no
-> graphical app yet.
+> Early stage: a command-line client and a server that sync a member's
+> devices; no shared budgets, encryption or graphical app yet.
 
 *Bougette* is the Old French word for a small leather purse, and the
 origin of the English word *budget*.
@@ -18,7 +18,7 @@ from source.
 
 ## Status
 
-The domain and its storage work, behind a command-line client (milestone
+The domain and its storage work behind a command-line client (milestone
 M0 of [doc/scope.md](doc/scope.md)):
 
 ```sh
@@ -27,6 +27,16 @@ nix run . -- budget new Household
 nix run . -- line add Household Rent Housing cost 900 monthly 2026-01-05
 nix run . -- tx add Household 2026-11-05 cost 950 Housing --line Rent
 nix run . -- show Household
+```
+
+A member's devices sync over [iroh](https://www.iroh.computer/), directly
+or through a server that keeps changes for devices that are offline
+(milestone M1):
+
+```sh
+nix run . -- id                    # on each device: its identifier
+nix run .#server -- --db server.sqlite --port 47210 --allow ID1,ID2
+nix run . -- sync ADDRESS          # on each device, ADDRESS as printed
 ```
 
 - [doc/scope.md](doc/scope.md): what v1 does and the milestones (French).
