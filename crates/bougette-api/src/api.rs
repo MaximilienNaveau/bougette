@@ -5,13 +5,17 @@
 use std::num::NonZeroU8;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
-use bougette_core::budget::{Budget, Comparison, MonthTotals};
-use bougette_core::id::{BudgetId, LineId, MemberId};
+use std::collections::HashSet;
+
+use bougette_core::budget::{Budget, BudgetError, Comparison, MonthTotals};
+use bougette_core::id::{BudgetId, LineId, MemberId, PotId, TransactionId};
 use bougette_core::line::{Kind, Line, View};
 use bougette_core::money::{Currency, Money};
 use bougette_core::month::Month;
+use bougette_core::pot::{Goal, Pot};
 use bougette_core::schedule::Schedule;
 use bougette_core::shared::reflections;
+use bougette_core::transaction::PotMove;
 use bougette_core::transaction::Transaction;
 use bougette_store::{Store, StoreError};
 use jiff::civil::Date;
@@ -88,12 +92,24 @@ pub struct LineRow {
     pub actual: i64,
     /// For a cost, its actual compared with what is due.
     pub status: Status,
+    /// What the line amounts to each time it's due, this month.
+    pub amount: i64,
+    /// How it repeats this month; `None` for a schedule the app can't
+    /// show (e.g. every 2 months, entered with the command line).
+    pub repeat: Option<Repeat>,
+    /// The last day it applies, if it ends.
+    pub ends_on: Option<String>,
+    /// For an allocation, the pot it feeds (its identifier).
+    pub pot: Option<String>,
 }
 
 /// A transaction in a month.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransactionRow {
     pub id: String,
+    /// In a personal budget, a reflection of a shared budget's
+    /// transaction: change it there, not here.
+    pub reflected: bool,
     /// `2026-11-16`.
     pub date: String,
     pub income: bool,
@@ -115,9 +131,12 @@ pub struct Totals {
 /// A pot and what it holds at the end of the month.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PotRow {
+    pub id: String,
     pub name: String,
     pub balance: i64,
     pub goal: Option<i64>,
+    /// When the goal is to be reached (`2027-06-30`), if set.
+    pub goal_by: Option<String>,
 }
 
 /// Everything about one month of a budget.
@@ -201,21 +220,13 @@ impl App {
         amount: i64,
         repeat: Repeat,
         first: String,
+        pot: Option<String>,
     ) -> Result<String, String> {
         let first = date(&first)?;
-        let months = |every| Schedule::Months {
-            every: NonZeroU8::new(every).expect("not zero"),
-            first,
-        };
-        let schedule = match repeat {
-            Repeat::Monthly => months(1),
-            Repeat::Quarterly => months(3),
-            Repeat::Yearly => months(12),
-            Repeat::Weekly => Schedule::Weekly { first },
-            Repeat::Once => Schedule::Once { on: first },
-        };
+        let schedule = schedule(repeat, first);
+        let pot = pot.map(|id| parse_id(&id).map(PotId)).transpose()?;
         self.edit(&budget, |budget| {
-            let line = Line::new(
+            let mut line = Line::new(
                 name,
                 category,
                 kind(income),
@@ -223,10 +234,9 @@ impl App {
                 Money::new(amount, budget.currency()),
                 schedule,
             )
-            .map_err(|error| format!("{error:?}"))?;
-            let id = budget
-                .add_line(line)
-                .map_err(|error| format!("{error:?}"))?;
+            .map_err(|error| BudgetError::from(error).to_string())?;
+            line.pot = pot;
+            let id = budget.add_line(line).map_err(|error| error.to_string())?;
             Ok(id.to_string())
         })
     }
@@ -243,10 +253,22 @@ impl App {
         category: String,
         line: Option<String>,
         note: String,
+        pot: Option<String>,
+        from_pot: bool,
     ) -> Result<String, String> {
         let day = date(&date_text)?;
-        let line = line
-            .map(|id| id.parse().map(LineId).map_err(|_| "not a line".to_string()))
+        let line = line.map(|id| parse_id(&id).map(LineId)).transpose()?;
+        // Into the pot (an allocation), or paid from it.
+        let pot = pot
+            .map(|id| {
+                parse_id(&id).map(|id| {
+                    if from_pot {
+                        PotMove::PaidFrom(PotId(id))
+                    } else {
+                        PotMove::Into(PotId(id))
+                    }
+                })
+            })
             .transpose()?;
         self.edit(&budget, |budget| {
             let mut transaction = Transaction::new(
@@ -257,10 +279,90 @@ impl App {
                 line,
             );
             transaction.note = note;
+            transaction.pot = pot;
             let id = budget
                 .add_transaction(transaction)
-                .map_err(|error| format!("{error:?}"))?;
+                .map_err(|error| error.to_string())?;
             Ok(id.to_string())
+        })
+    }
+
+    /// From `from` on, line `line` amounts to `amount` cents, due as
+    /// `repeat` says from `from`; the months before keep the old amount.
+    pub fn change_line(
+        &self,
+        budget: String,
+        line: String,
+        amount: i64,
+        repeat: Repeat,
+        from: String,
+    ) -> Result<(), String> {
+        let id = LineId(parse_id(&line)?);
+        let from = date(&from)?;
+        self.change(&budget, |budget| {
+            let amount = Money::new(amount, budget.currency());
+            budget.change_line(id, from, amount, schedule(repeat, from))
+        })
+    }
+
+    /// Line `line` stops after `last_day`, or goes on again with `None`.
+    pub fn end_line(
+        &self,
+        budget: String,
+        line: String,
+        last_day: Option<String>,
+    ) -> Result<(), String> {
+        let id = LineId(parse_id(&line)?);
+        let last_day = last_day.map(|day| date(&day)).transpose()?;
+        self.change(&budget, |budget| budget.end_line(id, last_day))
+    }
+
+    /// Removes line `line`, refused while transactions realise it.
+    pub fn remove_line(&self, budget: String, line: String) -> Result<(), String> {
+        let id = LineId(parse_id(&line)?);
+        self.change(&budget, |budget| budget.remove_line(id))
+    }
+
+    /// Removes transaction `transaction`.
+    pub fn remove_transaction(&self, budget: String, transaction: String) -> Result<(), String> {
+        let id = TransactionId(parse_id(&transaction)?);
+        self.change(&budget, |budget| budget.remove_transaction(id))
+    }
+
+    /// Adds a pot, with a goal of `goal` cents by `by` if given; returns
+    /// its identifier.
+    pub fn add_pot(
+        &self,
+        budget: String,
+        name: String,
+        goal: Option<i64>,
+        by: Option<String>,
+    ) -> Result<String, String> {
+        let by = by.map(|day| date(&day)).transpose()?;
+        self.edit(&budget, |budget| {
+            let mut pot = Pot::new(name);
+            pot.goal = goal.map(|cents| Goal {
+                amount: Money::new(cents, budget.currency()),
+                by,
+            });
+            Ok(budget.add_pot(pot).to_string())
+        })
+    }
+
+    /// Renames budget `budget`.
+    pub fn rename_budget(&self, budget: String, name: String) -> Result<(), String> {
+        self.change(&budget, |budget| {
+            budget.name = name;
+            Ok(())
+        })
+    }
+
+    /// Makes `budget` this member's personal budget, or not: their
+    /// contributions and advances in shared budgets show in it.
+    pub fn set_personal(&self, budget: String, personal: bool) -> Result<(), String> {
+        self.change(&budget, |budget| {
+            budget.personal = personal;
+            Ok(())
         })
     }
 
@@ -317,6 +419,8 @@ impl App {
     fn month_on(&self, budget: &str, month: &str, today: Date) -> Result<MonthView, String> {
         let mut budget = self.load(budget)?;
         let month = parse_month(month)?;
+        // The budget's own transactions, before reflections are added.
+        let own: HashSet<TransactionId> = budget.transactions().iter().map(|t| t.id).collect();
         // A personal budget shows what its member paid or received in the
         // shared ones (computed here, never saved).
         if budget.personal {
@@ -343,6 +447,12 @@ impl App {
                     continue;
                 };
                 let smoothed = line.amount_in(month, View::Smoothed);
+                // The revision in force at the end of the month (a change
+                // from the 5th shows from that month on), or the last one
+                // if the line ended earlier.
+                let revision = line
+                    .revision_on(month.last_day())
+                    .or(line.revisions().last());
                 if smoothed.minor_units() == 0
                     && comparison.planned.minor_units() == 0
                     && comparison.actual.minor_units() == 0
@@ -362,6 +472,10 @@ impl App {
                     } else {
                         status(comparison)
                     },
+                    amount: revision.map_or(0, |revision| revision.amount.minor_units()),
+                    repeat: revision.and_then(|revision| repeat_of(revision.schedule)),
+                    ends_on: line.ends_on().map(|day| day.to_string()),
+                    pot: line.pot.map(|pot| pot.to_string()),
                 });
             }
         }
@@ -375,6 +489,7 @@ impl App {
             .into_iter()
             .map(|transaction| TransactionRow {
                 id: transaction.id.to_string(),
+                reflected: !own.contains(&transaction.id),
                 date: transaction.date.to_string(),
                 income: transaction.kind == Kind::Income,
                 amount: transaction.amount.minor_units(),
@@ -392,11 +507,13 @@ impl App {
             .pots()
             .iter()
             .map(|pot| PotRow {
+                id: pot.id.to_string(),
                 name: pot.name.clone(),
                 balance: budget
                     .pot_balance(pot.id, month.last_day())
                     .map_or(0, |balance| balance.minor_units()),
                 goal: pot.goal.map(|goal| goal.amount.minor_units()),
+                goal_by: pot.goal.and_then(|goal| goal.by).map(|day| day.to_string()),
             })
             .collect();
         Ok(MonthView {
@@ -439,6 +556,20 @@ impl App {
         Ok(result)
     }
 
+    /// Like `edit`, for a change the budget may refuse with a
+    /// BudgetError, shown in words.
+    fn change(
+        &self,
+        id: &str,
+        change: impl FnOnce(&mut Budget) -> Result<(), BudgetError>,
+    ) -> Result<(), String> {
+        self.edit(id, |budget| {
+            change(budget).map_err(|error| error.to_string())?;
+            Ok(String::new())
+        })
+        .map(|_| ())
+    }
+
     fn lock(&self) -> MutexGuard<'_, Store> {
         self.store.lock().unwrap_or_else(PoisonError::into_inner)
     }
@@ -468,6 +599,40 @@ fn totals(totals: MonthTotals) -> Totals {
         costs: totals.costs.minor_units(),
         balance: totals.balance().minor_units(),
     }
+}
+
+/// The schedule of a line repeating as `repeat` from `first`.
+fn schedule(repeat: Repeat, first: Date) -> Schedule {
+    let months = |every| Schedule::Months {
+        every: NonZeroU8::new(every).expect("not zero"),
+        first,
+    };
+    match repeat {
+        Repeat::Monthly => months(1),
+        Repeat::Quarterly => months(3),
+        Repeat::Yearly => months(12),
+        Repeat::Weekly => Schedule::Weekly { first },
+        Repeat::Once => Schedule::Once { on: first },
+    }
+}
+
+/// The reverse, if the app can show it.
+fn repeat_of(schedule: Schedule) -> Option<Repeat> {
+    match schedule {
+        Schedule::Months { every, .. } => match every.get() {
+            1 => Some(Repeat::Monthly),
+            3 => Some(Repeat::Quarterly),
+            12 => Some(Repeat::Yearly),
+            _ => None,
+        },
+        Schedule::Weekly { .. } => Some(Repeat::Weekly),
+        Schedule::Once { .. } => Some(Repeat::Once),
+    }
+}
+
+fn parse_id(text: &str) -> Result<uuid::Uuid, String> {
+    text.parse()
+        .map_err(|_| format!("not an identifier: {text}"))
 }
 
 fn kind(income: bool) -> Kind {
@@ -523,6 +688,7 @@ mod tests {
             250000,
             pay,
             "2026-01-01".into(),
+            None,
         )
         .unwrap();
         let rent = app
@@ -534,6 +700,7 @@ mod tests {
                 90000,
                 pay,
                 "2026-01-05".into(),
+                None,
             )
             .unwrap();
         app.add_line(
@@ -544,6 +711,7 @@ mod tests {
             48000,
             Repeat::Yearly,
             "2026-03-10".into(),
+            None,
         )
         .unwrap();
         app.add_transaction(
@@ -554,6 +722,8 @@ mod tests {
             "Housing".into(),
             Some(rent),
             "November".into(),
+            None,
+            false,
         )
         .unwrap();
         id
@@ -601,5 +771,68 @@ mod tests {
         assert_eq!(view.transactions[0].line.as_deref(), Some("Rent"));
         assert_eq!(view.status, Status::Over);
         assert!(app.month_on(&id, "November", day(2026, 11, 16)).is_err());
+    }
+
+    #[test]
+    fn lines_change_end_and_pots_fill() {
+        let app = app();
+        let id = household(&app);
+        let today = day(2026, 11, 16);
+        let rent = |app: &App, month: &str| {
+            let view = app.month_on(&id, month, today).unwrap();
+            view.lines
+                .into_iter()
+                .find(|line| line.name == "Rent")
+                .unwrap()
+        };
+        let line = rent(&app, "2026-11").id;
+        assert_eq!(rent(&app, "2026-11").repeat, Some(Repeat::Monthly));
+
+        // The rent goes up in December; November keeps the old amount.
+        app.change_line(
+            id.clone(),
+            line.clone(),
+            95000,
+            Repeat::Monthly,
+            "2026-12-05".into(),
+        )
+        .unwrap();
+        assert_eq!(rent(&app, "2026-11").amount, 90000);
+        assert_eq!(rent(&app, "2026-12").amount, 95000);
+        app.end_line(id.clone(), line.clone(), Some("2027-06-30".into()))
+            .unwrap();
+        assert_eq!(rent(&app, "2026-12").ends_on.as_deref(), Some("2027-06-30"));
+        // Its November payment keeps it from being removed, in words.
+        let refused = app.remove_line(id.clone(), line.clone()).unwrap_err();
+        assert!(refused.contains("has transactions"), "{refused}");
+        let payment = app.month_on(&id, "2026-11", today).unwrap().transactions[0].clone();
+        assert!(!payment.reflected);
+        app.remove_transaction(id.clone(), payment.id).unwrap();
+        app.remove_line(id.clone(), line).unwrap();
+
+        // A pot with a goal, and 100 put in it.
+        let bike = app
+            .add_pot(
+                id.clone(),
+                "Bike".into(),
+                Some(120000),
+                Some("2027-06-30".into()),
+            )
+            .unwrap();
+        app.add_transaction(
+            id.clone(),
+            "2026-11-02".into(),
+            false,
+            10000,
+            "Savings".into(),
+            None,
+            String::new(),
+            Some(bike),
+            false,
+        )
+        .unwrap();
+        let pots = app.month_on(&id, "2026-11", today).unwrap().pots;
+        assert_eq!(pots[0].balance, 10000);
+        assert_eq!(pots[0].goal_by.as_deref(), Some("2027-06-30"));
     }
 }

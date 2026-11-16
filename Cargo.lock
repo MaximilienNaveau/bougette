@@ -283,6 +283,7 @@ dependencies = [
  "bougette-store",
  "flutter_rust_bridge",
  "jiff",
+ "uuid",
 ]
 
 [[package]]

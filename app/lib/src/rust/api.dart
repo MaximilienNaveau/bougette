@@ -7,7 +7,7 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `budgets_on`, `calendar_on`, `date`, `edit`, `kind`, `load`, `lock`, `month_on`, `month_text`, `parse_month`, `source`, `status`, `stored`, `today`, `totals`
+// These functions are ignored because they are not marked as `pub`: `budgets_on`, `calendar_on`, `change`, `date`, `edit`, `kind`, `load`, `lock`, `month_on`, `month_text`, `parse_id`, `parse_month`, `repeat_of`, `schedule`, `source`, `status`, `stored`, `today`, `totals`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<App>>
@@ -22,6 +22,16 @@ abstract class App implements RustOpaqueInterface {
     required PlatformInt64 amount,
     required Repeat repeat,
     required String first,
+    String? pot,
+  });
+
+  /// Adds a pot, with a goal of `goal` cents by `by` if given; returns
+  /// its identifier.
+  Future<String> addPot({
+    required String budget,
+    required String name,
+    PlatformInt64? goal,
+    String? by,
   });
 
   /// Adds a transaction of `amount` cents on `date`, realising the line
@@ -34,6 +44,8 @@ abstract class App implements RustOpaqueInterface {
     required String category,
     String? line,
     required String note,
+    String? pot,
+    required bool fromPot,
   });
 
   /// The budgets, by name, with this month's balances.
@@ -42,8 +54,25 @@ abstract class App implements RustOpaqueInterface {
   /// The twelve months of `year` for budget `budget`.
   Future<List<MonthCell>> calendar({required String budget, required int year});
 
+  /// From `from` on, line `line` amounts to `amount` cents, due as
+  /// `repeat` says from `from`; the months before keep the old amount.
+  Future<void> changeLine({
+    required String budget,
+    required String line,
+    required PlatformInt64 amount,
+    required Repeat repeat,
+    required String from,
+  });
+
   /// Creates a budget; returns its identifier.
   Future<String> createBudget({required String name, required String currency});
+
+  /// Line `line` stops after `last_day`, or goes on again with `None`.
+  Future<void> endLine({
+    required String budget,
+    required String line,
+    String? lastDay,
+  });
 
   /// Month `month` (`2026-11`) of budget `budget`.
   Future<MonthView> month({required String budget, required String month});
@@ -51,6 +80,22 @@ abstract class App implements RustOpaqueInterface {
   /// Opens (or creates) the database at `path`.
   static Future<App> open({required String path}) =>
       RustLib.instance.api.crateApiAppOpen(path: path);
+
+  /// Removes line `line`, refused while transactions realise it.
+  Future<void> removeLine({required String budget, required String line});
+
+  /// Removes transaction `transaction`.
+  Future<void> removeTransaction({
+    required String budget,
+    required String transaction,
+  });
+
+  /// Renames budget `budget`.
+  Future<void> renameBudget({required String budget, required String name});
+
+  /// Makes `budget` this member's personal budget, or not: their
+  /// contributions and advances in shared budgets show in it.
+  Future<void> setPersonal({required String budget, required bool personal});
 }
 
 /// A budget on the home screen.
@@ -111,6 +156,19 @@ class LineRow {
   /// For a cost, its actual compared with what is due.
   final Status status;
 
+  /// What the line amounts to each time it's due, this month.
+  final PlatformInt64 amount;
+
+  /// How it repeats this month; `None` for a schedule the app can't
+  /// show (e.g. every 2 months, entered with the command line).
+  final Repeat? repeat;
+
+  /// The last day it applies, if it ends.
+  final String? endsOn;
+
+  /// For an allocation, the pot it feeds (its identifier).
+  final String? pot;
+
   const LineRow({
     required this.id,
     required this.name,
@@ -120,6 +178,10 @@ class LineRow {
     required this.smoothed,
     required this.actual,
     required this.status,
+    required this.amount,
+    this.repeat,
+    this.endsOn,
+    this.pot,
   });
 
   @override
@@ -131,7 +193,11 @@ class LineRow {
       due.hashCode ^
       smoothed.hashCode ^
       actual.hashCode ^
-      status.hashCode;
+      status.hashCode ^
+      amount.hashCode ^
+      repeat.hashCode ^
+      endsOn.hashCode ^
+      pot.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -145,7 +211,11 @@ class LineRow {
           due == other.due &&
           smoothed == other.smoothed &&
           actual == other.actual &&
-          status == other.status;
+          status == other.status &&
+          amount == other.amount &&
+          repeat == other.repeat &&
+          endsOn == other.endsOn &&
+          pot == other.pot;
 }
 
 /// One month of the calendar.
@@ -274,23 +344,40 @@ class MonthView {
 
 /// A pot and what it holds at the end of the month.
 class PotRow {
+  final String id;
   final String name;
   final PlatformInt64 balance;
   final PlatformInt64? goal;
 
-  const PotRow({required this.name, required this.balance, this.goal});
+  /// When the goal is to be reached (`2027-06-30`), if set.
+  final String? goalBy;
+
+  const PotRow({
+    required this.id,
+    required this.name,
+    required this.balance,
+    this.goal,
+    this.goalBy,
+  });
 
   @override
-  int get hashCode => name.hashCode ^ balance.hashCode ^ goal.hashCode;
+  int get hashCode =>
+      id.hashCode ^
+      name.hashCode ^
+      balance.hashCode ^
+      goal.hashCode ^
+      goalBy.hashCode;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is PotRow &&
           runtimeType == other.runtimeType &&
+          id == other.id &&
           name == other.name &&
           balance == other.balance &&
-          goal == other.goal;
+          goal == other.goal &&
+          goalBy == other.goalBy;
 }
 
 /// When a new line is due, from its first due date on. A plain enum (no
@@ -360,6 +447,10 @@ class Totals {
 class TransactionRow {
   final String id;
 
+  /// In a personal budget, a reflection of a shared budget's
+  /// transaction: change it there, not here.
+  final bool reflected;
+
   /// `2026-11-16`.
   final String date;
   final bool income;
@@ -372,6 +463,7 @@ class TransactionRow {
 
   const TransactionRow({
     required this.id,
+    required this.reflected,
     required this.date,
     required this.income,
     required this.amount,
@@ -383,6 +475,7 @@ class TransactionRow {
   @override
   int get hashCode =>
       id.hashCode ^
+      reflected.hashCode ^
       date.hashCode ^
       income.hashCode ^
       amount.hashCode ^
@@ -396,6 +489,7 @@ class TransactionRow {
       other is TransactionRow &&
           runtimeType == other.runtimeType &&
           id == other.id &&
+          reflected == other.reflected &&
           date == other.date &&
           income == other.income &&
           amount == other.amount &&
