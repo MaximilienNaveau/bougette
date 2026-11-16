@@ -71,7 +71,7 @@ Chaque jalon est utilisable et testé seul.
    - pas de réseau.
 2. **M1 : synchronisation**
    - deux appareils d'un même membre convergent : directement par iroh, puis via `bougette-server` qui joue la boîte aux lettres ;
-   - HLC, la modification la plus récente gagne, Merkle.
+   - HLC, la modification la plus récente gagne, vecteur de versions ([ADR 0004](adr/0004-vecteur-de-versions-plutot-que-merkle.md)).
 3. **M2 : membres et chiffrement**
    - clés par budget, invitations, rôles ;
    - budget partagé avec versements et avances reflétés ;
