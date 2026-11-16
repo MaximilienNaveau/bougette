@@ -3,10 +3,11 @@
 use jiff::civil::Date;
 
 use crate::id::{BudgetId, LineId, PotId, TransactionId};
-use crate::line::{Kind, Line, View};
+use crate::line::{Kind, Line, LineError, View};
 use crate::money::{Currency, Money};
 use crate::month::Month;
 use crate::pot::Pot;
+use crate::schedule::Schedule;
 use crate::transaction::{PotMove, Transaction};
 
 /// A budget (GLOSSARY.md: Budget): its lines (the plan), its transactions
@@ -110,6 +111,21 @@ pub enum BudgetError {
     PotNeedsACost,
     /// A transaction on an allocation line doesn't feed that line's pot.
     PotMismatch,
+    /// No transaction of this budget has that identifier.
+    UnknownTransaction,
+    /// The line still has transactions: remove them first.
+    LineInUse,
+    /// The line refused the change.
+    // A variant can carry data: this one wraps the line's own error.
+    Line(LineError),
+}
+
+// Lets `?` turn a LineError into a BudgetError (see bougette-store's
+// StoreError for the same pattern).
+impl From<LineError> for BudgetError {
+    fn from(error: LineError) -> Self {
+        BudgetError::Line(error)
+    }
 }
 
 impl Budget {
@@ -217,6 +233,63 @@ impl Budget {
         let id = transaction.id;
         self.transactions.push(transaction);
         Ok(id)
+    }
+
+    /// From `from` on, line `id` has a new amount and schedule; months
+    /// before keep the old ones (see `Line::change_from`).
+    pub fn change_line(
+        &mut self,
+        id: LineId,
+        from: Date,
+        amount: Money,
+        schedule: Schedule,
+    ) -> Result<(), BudgetError> {
+        if amount.currency() != self.currency {
+            return Err(BudgetError::WrongCurrency);
+        }
+        // Two `?` in a row: the first fails on an unknown line, the second
+        // converts the line's refusal with `From` above.
+        self.line_mut(id)?.change_from(from, amount, schedule)?;
+        Ok(())
+    }
+
+    /// Line `id` stops after `last_day`, or goes on again with `None`.
+    pub fn end_line(&mut self, id: LineId, last_day: Option<Date>) -> Result<(), BudgetError> {
+        self.line_mut(id)?.end_on(last_day)?;
+        Ok(())
+    }
+
+    /// Removes line `id`, refused while transactions still realise it. To
+    /// stop a line that was real, end it instead: its past stays planned.
+    pub fn remove_line(&mut self, id: LineId) -> Result<(), BudgetError> {
+        self.line(id).ok_or(BudgetError::UnknownLine)?;
+        if self.transactions.iter().any(|t| t.line == Some(id)) {
+            return Err(BudgetError::LineInUse);
+        }
+        self.lines.retain(|line| line.id != id);
+        Ok(())
+    }
+
+    /// Removes transaction `id`.
+    pub fn remove_transaction(&mut self, id: TransactionId) -> Result<(), BudgetError> {
+        // `position` is `std::find_if` returning an index.
+        let index = self
+            .transactions
+            .iter()
+            .position(|transaction| transaction.id == id)
+            .ok_or(BudgetError::UnknownTransaction)?;
+        self.transactions.remove(index);
+        Ok(())
+    }
+
+    /// Line `id`, to change it. Private: `pub` access would let callers
+    /// turn an allocation into an income, bypassing `add_line`'s checks.
+    // `iter_mut` yields `&mut Line`, so the result can be modified.
+    fn line_mut(&mut self, id: LineId) -> Result<&mut Line, BudgetError> {
+        self.lines
+            .iter_mut()
+            .find(|line| line.id == id)
+            .ok_or(BudgetError::UnknownLine)
     }
 
     /// What pot `id` holds at the end of `date`: what was allocated to it
@@ -749,5 +822,51 @@ mod tests {
             budget.add_transaction(missing),
             Err(BudgetError::PotMismatch)
         );
+    }
+
+    #[test]
+    fn changes_ends_and_removes_lines() {
+        let (mut budget, rent, groceries) = household();
+        // The rent goes up in April: March keeps the old amount.
+        budget
+            .change_line(
+                rent,
+                date(2026, 4, 1),
+                eur(95000),
+                every(1, date(2026, 4, 5)),
+            )
+            .unwrap();
+        assert_eq!(
+            budget.compare_line(rent, month(2026, 3)).unwrap().planned,
+            eur(90000)
+        );
+        assert_eq!(
+            budget.compare_line(rent, month(2026, 4)).unwrap().planned,
+            eur(95000)
+        );
+        // A change before the line starts is the line's error, wrapped.
+        assert_eq!(
+            budget.change_line(rent, date(2025, 1, 1), eur(1), every(1, date(2025, 1, 1))),
+            Err(BudgetError::Line(LineError::BeforeStart))
+        );
+        // Ended after June: nothing planned in July.
+        budget.end_line(rent, Some(date(2026, 6, 30))).unwrap();
+        assert_eq!(
+            budget.compare_line(rent, month(2026, 7)).unwrap().planned,
+            eur(0)
+        );
+        // A line with transactions can't be removed until they are.
+        let shopping = budget
+            .add_transaction(cost(date(2026, 1, 10), 5000, "Food", Some(groceries)))
+            .unwrap();
+        assert_eq!(budget.remove_line(groceries), Err(BudgetError::LineInUse));
+        budget.remove_transaction(shopping).unwrap();
+        assert_eq!(
+            budget.remove_transaction(shopping),
+            Err(BudgetError::UnknownTransaction)
+        );
+        budget.remove_line(groceries).unwrap();
+        assert!(budget.line(groceries).is_none());
+        assert_eq!(budget.remove_line(groceries), Err(BudgetError::UnknownLine));
     }
 }

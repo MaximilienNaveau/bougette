@@ -374,9 +374,9 @@ mod tests {
         store.save(&budget).unwrap();
         // A change from April replaces the July revision of the rent.
         let rent_id = budget.lines()[0].id;
-        let mut lines: Vec<Line> = budget.lines().to_vec();
-        lines[0]
-            .change_from(
+        budget
+            .change_line(
+                rent_id,
                 date(2026, 4, 1),
                 eur(92000),
                 Schedule::Months {
@@ -385,20 +385,6 @@ mod tests {
                 },
             )
             .unwrap();
-        // Rebuild the budget with the changed line (the domain has no
-        // "replace line" yet).
-        let mut changed = Budget::new(budget.name.clone(), budget.currency());
-        changed.id = budget.id;
-        for pot in budget.pots() {
-            changed.add_pot(pot.clone());
-        }
-        for line in lines {
-            changed.add_line(line).unwrap();
-        }
-        for transaction in budget.transactions() {
-            changed.add_transaction(transaction.clone()).unwrap();
-        }
-        budget = changed;
         store.save(&budget).unwrap();
         let loaded = store.load(budget.id).unwrap().unwrap();
         let rent = loaded.line(rent_id).unwrap();
