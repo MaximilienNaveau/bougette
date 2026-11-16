@@ -21,6 +21,7 @@
 //! thread. Unlike C++20 coroutines, Rust ships no scheduler: a runtime
 //! (here tokio) drives the futures. There is no direct C++ equivalent.
 
+pub mod client;
 pub mod net;
 mod wire;
 
