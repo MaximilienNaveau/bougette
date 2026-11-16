@@ -154,6 +154,21 @@ impl Store {
             .optional()?)
     }
 
+    /// A setting of this device, if set. Settings stay on the device: they
+    /// are never synced.
+    pub fn setting(&self, key: &str) -> Result<Option<String>, StoreError> {
+        Store::meta(&self.connection, key)
+    }
+
+    /// Sets a setting of this device.
+    pub fn set_setting(&mut self, key: &str, value: &str) -> Result<(), StoreError> {
+        self.connection.execute(
+            "INSERT OR REPLACE INTO meta (key, value) VALUES (?1, ?2)",
+            params![key, value],
+        )?;
+        Ok(())
+    }
+
     /// Saves `budget`: one message per field that differs from what is
     /// stored. Entities missing from `budget` are marked deleted.
     pub fn save(&mut self, budget: &Budget) -> Result<(), StoreError> {
