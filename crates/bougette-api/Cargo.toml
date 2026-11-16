@@ -1,0 +1,22 @@
+[package]
+name = "bougette-api"
+description = "Bougette's API for the Flutter app: ready-to-show views and user actions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+# A shared library the app loads (`cdylib`, like a .so built by
+# add_library(SHARED) in CMake), and a Rust library for the tests.
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+bougette-core = { path = "../bougette-core" }
+bougette-store = { path = "../bougette-store" }
+# Dates, and today's date in the system's time zone (as in the CLI).
+jiff = { version = "0.2", default-features = false, features = [
+    "std",
+    "tz-system",
+    "tzdb-zoneinfo",
+] }

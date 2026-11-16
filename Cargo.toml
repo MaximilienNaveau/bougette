@@ -8,6 +8,7 @@ members = [
     "crates/bougette-cli",
     "crates/bougette-sync",
     "crates/bougette-server",
+    "crates/bougette-api",
 ]
 # Version 3 of Cargo's dependency resolver, the default for edition 2024.
 resolver = "3"

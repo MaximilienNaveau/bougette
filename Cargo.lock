@@ -197,6 +197,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bougette-api"
+version = "0.1.0"
+dependencies = [
+ "bougette-core",
+ "bougette-store",
+ "jiff",
+]
+
+[[package]]
 name = "bougette-cli"
 version = "0.1.0"
 dependencies = [
