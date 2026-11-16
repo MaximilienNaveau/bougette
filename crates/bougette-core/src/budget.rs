@@ -16,6 +16,9 @@ use crate::transaction::{PotMove, Transaction};
 pub struct Budget {
     pub id: BudgetId,
     pub name: String,
+    /// A member's personal budget: their contributions, advances and
+    /// repayments in shared budgets show in it (see `with_reflections`).
+    pub personal: bool,
     // Private: fixed when the budget is created (doc/scope.md).
     currency: Currency,
     // Private: `add_line`, `add_transaction` and `add_pot` check what goes
@@ -118,6 +121,8 @@ pub enum BudgetError {
     /// The line refused the change.
     // A variant can carry data: this one wraps the line's own error.
     Line(LineError),
+    /// Only a cost can be paid to a member, and not by another member.
+    PayeeNeedsACost,
 }
 
 // Lets `?` turn a LineError into a BudgetError (see bougette-store's
@@ -138,6 +143,7 @@ impl Budget {
             lines: Vec::new(),
             transactions: Vec::new(),
             pots: Vec::new(),
+            personal: false,
         }
     }
 
@@ -223,6 +229,11 @@ impl Budget {
                 return Err(BudgetError::PotMismatch);
             }
         }
+        if transaction.payee.is_some()
+            && (transaction.kind != Kind::Cost || transaction.payer.is_some())
+        {
+            return Err(BudgetError::PayeeNeedsACost);
+        }
         if let Some(PotMove::Into(pot) | PotMove::PaidFrom(pot)) = transaction.pot {
             // `A(x) | B(x)` matches either variant and binds `x` in both.
             if transaction.kind != Kind::Cost {
@@ -290,6 +301,23 @@ impl Budget {
             .iter_mut()
             .find(|line| line.id == id)
             .ok_or(BudgetError::UnknownLine)
+    }
+
+    /// This budget with `extra` transactions added without checks: the
+    /// reflections of shared budgets in a personal budget (see
+    /// `shared::reflections`), for display. Never save the result: the
+    /// reflections would then be counted twice.
+    pub fn with_reflections(&self, extra: Vec<Transaction>) -> Budget {
+        let mut budget = self.clone();
+        // `extend` appends every item of an iterator, like
+        // `v.insert(v.end(), ...)`; amounts in another currency are left
+        // out.
+        budget.transactions.extend(
+            extra
+                .into_iter()
+                .filter(|transaction| transaction.amount.currency() == self.currency),
+        );
+        budget
     }
 
     /// What pot `id` holds at the end of `date`: what was allocated to it

@@ -2,7 +2,7 @@
 
 use jiff::civil::Date;
 
-use crate::id::{LineId, PotId, TransactionId};
+use crate::id::{LineId, MemberId, PotId, TransactionId};
 use crate::line::Kind;
 use crate::money::Money;
 
@@ -24,6 +24,14 @@ pub struct Transaction {
     pub pot: Option<PotMove>,
     /// Free text, e.g. "Engie, November".
     pub note: String,
+    /// In a shared budget, the member who paid with their own money
+    /// (GLOSSARY.md: Payer): an income paid by a member is their
+    /// contribution, a cost paid by a member is an advance. `None`: the
+    /// budget's joint money.
+    pub payer: Option<MemberId>,
+    /// In a shared budget, the member a cost was paid to, e.g. paying back
+    /// their advances (GLOSSARY.md: Settlement).
+    pub payee: Option<MemberId>,
 }
 
 /// How a transaction moves money for a pot. Both are costs of the budget.
@@ -56,6 +64,8 @@ impl Transaction {
             pot: None,
             // `String::new()` is an empty string.
             note: String::new(),
+            payer: None,
+            payee: None,
         }
     }
 }

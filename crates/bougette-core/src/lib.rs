@@ -17,5 +17,6 @@ pub mod money;
 pub mod month;
 pub mod pot;
 pub mod schedule;
+pub mod shared;
 pub mod split;
 pub mod transaction;

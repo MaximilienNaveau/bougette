@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::num::NonZeroU8;
 
 use bougette_core::budget::Budget;
-use bougette_core::id::{BudgetId, LineId, PotId, TransactionId};
+use bougette_core::id::{BudgetId, LineId, MemberId, PotId, TransactionId};
 use bougette_core::line::{Kind, Line};
 use bougette_core::money::{Currency, Money};
 use bougette_core::pot::{Goal, Pot};
@@ -55,6 +55,8 @@ pub fn encode(budget: &Budget) -> Records {
         vec![
             ("name", Some(budget.name.clone())),
             ("currency", Some(currency.code().to_string())),
+            // `then` gives `Some(...)` if the bool is true, else `None`.
+            ("personal", budget.personal.then(|| "true".to_string())),
         ],
     );
     for pot in budget.pots() {
@@ -108,6 +110,14 @@ pub fn encode(budget: &Budget) -> Records {
                 ("line", transaction.line.map(|line| line.to_string())),
                 ("pot", transaction.pot.map(encode_pot_move)),
                 ("note", Some(transaction.note.clone())),
+                (
+                    "payer",
+                    transaction.payer.as_ref().map(|member| member.0.clone()),
+                ),
+                (
+                    "payee",
+                    transaction.payee.as_ref().map(|member| member.0.clone()),
+                ),
             ],
         );
     }
@@ -147,6 +157,7 @@ pub fn decode(records: &Records) -> Result<Option<Budget>, Corrupt> {
     let currency = Currency::from_code(code).ok_or_else(|| corrupt("currency", code))?;
     let mut budget = Budget::new(text(fields, "name")?, currency);
     budget.id = BudgetId(parse_uuid(id)?);
+    budget.personal = optional(fields, "personal").is_some();
 
     for (id, fields) in of_kind("pot") {
         let mut pot = Pot::new(text(fields, "name")?);
@@ -216,6 +227,8 @@ pub fn decode(records: &Records) -> Result<Option<Budget>, Corrupt> {
                 .transpose()?,
             pot: optional(fields, "pot").map(decode_pot_move).transpose()?,
             note: text(fields, "note")?.to_string(),
+            payer: optional(fields, "payer").map(|member| MemberId(member.to_string())),
+            payee: optional(fields, "payee").map(|member| MemberId(member.to_string())),
         };
         budget
             .add_transaction(transaction)

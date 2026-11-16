@@ -44,6 +44,18 @@ macro_rules! id_type {
 }
 
 // Each call expands to a full type definition, as if written out here.
+/// The identifier of a member: their public key, in hexadecimal. The
+/// core treats it as an opaque name; the store creates and checks keys.
+// Not `Copy`: it owns a String (64 characters).
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct MemberId(pub String);
+
+impl std::fmt::Display for MemberId {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 id_type!(
     /// The identifier of a budget.
     BudgetId

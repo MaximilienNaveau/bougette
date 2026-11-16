@@ -373,6 +373,7 @@ fn apply(connection: &Connection, message: &Message) -> Result<bool, StoreError>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bougette_core::id::MemberId;
     use bougette_core::line::{Kind, Line};
     use bougette_core::money::{Currency, Money};
     use bougette_core::pot::{Goal, Pot};
@@ -389,6 +390,7 @@ mod tests {
     /// two revisions and an end date, an allocation, transactions.
     fn sample() -> Budget {
         let mut budget = Budget::new("Household", Currency::EUR);
+        budget.personal = true;
         let mut bike = Pot::new("Bike");
         bike.goal = Some(Goal {
             amount: eur(120000),
@@ -436,6 +438,7 @@ mod tests {
             Some(rent),
         );
         paid.note = "January".to_string();
+        paid.payer = Some(MemberId("ab".repeat(32)));
         budget.add_transaction(paid).unwrap();
         let mut purchase =
             Transaction::new(date(2026, 5, 2), Kind::Cost, eur(-500), "Transport", None);

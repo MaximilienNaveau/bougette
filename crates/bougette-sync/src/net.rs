@@ -215,7 +215,7 @@ mod tests {
             summary,
             Summary {
                 sent: 0,
-                received: 3
+                received: 4
             }
         );
         assert_eq!(

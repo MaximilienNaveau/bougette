@@ -165,19 +165,19 @@ mod tests {
         let (laptop, groceries) = store_with("Courses");
         let (phone, trip) = store_with("Voyage à Lyon");
         let (from_laptop, from_phone) = sync(&laptop, &phone).await;
-        // Each budget is 3 messages: name, currency, deleted.
+        // Each budget is 4 messages: name, currency, personal, deleted.
         assert_eq!(
             from_laptop,
             Summary {
-                sent: 3,
-                received: 3
+                sent: 4,
+                received: 4
             }
         );
         assert_eq!(
             from_phone,
             Summary {
-                sent: 3,
-                received: 3
+                sent: 4,
+                received: 4
             }
         );
         for store in [&laptop, &phone] {
@@ -212,7 +212,7 @@ mod tests {
             back,
             Summary {
                 sent: 0,
-                received: 3
+                received: 4
             }
         );
         assert_eq!(

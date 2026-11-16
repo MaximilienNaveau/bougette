@@ -676,6 +676,7 @@ fn explain(error: BudgetError) -> String {
         BudgetError::LineInUse => "the line has transactions: remove them first, or end the line",
         BudgetError::Line(LineError::BeforeStart) => "the date is before the line starts",
         BudgetError::Line(LineError::NotPositive) => "a line's amount must be positive",
+        BudgetError::PayeeNeedsACost => "only a cost can be paid to a member, and not by a member",
     };
     reason.to_string()
 }
