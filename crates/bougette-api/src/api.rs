@@ -142,11 +142,14 @@ pub struct MonthView {
     pub pots: Vec<PotRow>,
 }
 
-/// When a new line is due, from its first due date on.
+/// When a new line is due, from its first due date on. A plain enum (no
+/// data in its variants) becomes a plain Dart enum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Repeat {
-    /// Every `n` months on the first date's day (1 monthly, 12 yearly).
-    Months(u8),
+    /// Every month on the first date's day.
+    Monthly,
+    Quarterly,
+    Yearly,
     Weekly,
     Once,
 }
@@ -200,11 +203,14 @@ impl App {
         first: String,
     ) -> Result<String, String> {
         let first = date(&first)?;
+        let months = |every| Schedule::Months {
+            every: NonZeroU8::new(every).expect("not zero"),
+            first,
+        };
         let schedule = match repeat {
-            Repeat::Months(every) => Schedule::Months {
-                every: NonZeroU8::new(every).ok_or("every 0 months")?,
-                first,
-            },
+            Repeat::Monthly => months(1),
+            Repeat::Quarterly => months(3),
+            Repeat::Yearly => months(12),
             Repeat::Weekly => Schedule::Weekly { first },
             Repeat::Once => Schedule::Once { on: first },
         };
@@ -508,7 +514,7 @@ mod tests {
     /// A household budget with rent, an overspent month and a yearly line.
     fn household(app: &App) -> String {
         let id = app.create_budget("Household".into(), "EUR".into()).unwrap();
-        let pay = Repeat::Months(1);
+        let pay = Repeat::Monthly;
         app.add_line(
             id.clone(),
             "Pay".into(),
@@ -536,7 +542,7 @@ mod tests {
             "Housing".into(),
             false,
             48000,
-            Repeat::Months(12),
+            Repeat::Yearly,
             "2026-03-10".into(),
         )
         .unwrap();

@@ -12,6 +12,10 @@ repository.workspace = true
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
+# The runtime half of the bridge to Dart; the same version as the Dart
+# package and the code generator, or the generated code won't match.
+# Licence: MIT.
+flutter_rust_bridge = "=2.13.0"
 bougette-core = { path = "../bougette-core" }
 bougette-store = { path = "../bougette-store" }
 # Dates, and today's date in the system's time zone (as in the CLI).

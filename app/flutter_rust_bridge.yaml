@@ -1,0 +1,8 @@
+# flutter_rust_bridge's code generator: reads the Rust API, writes the
+# Dart side (lib/src/rust/) and the Rust glue (frb_generated.rs).
+rust_input: crate::api
+rust_root: ../crates/bougette-api
+dart_output: lib/src/rust
+# The app loads the library Nix builds (see lib/main.dart), not one built
+# by a Flutter plugin.
+web: false

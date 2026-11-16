@@ -7,3 +7,5 @@
 //! them for people is the app's job.
 
 pub mod api;
+// Written by flutter_rust_bridge's generator: the C functions Dart calls.
+mod frb_generated;
