@@ -185,6 +185,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bougette-server"
+version = "0.1.0"
+dependencies = [
+ "bougette-store",
+ "bougette-sync",
+ "tokio",
+]
+
+[[package]]
 name = "bougette-store"
 version = "0.1.0"
 dependencies = [

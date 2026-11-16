@@ -59,33 +59,43 @@
             doCheck = false;
             installPhase = ''touch "$out"'';
           };
+
+        # One executable of the workspace: `pname` built from `crate`.
+        binary =
+          pname: crate: description:
+          pkgs.rustPlatform.buildRustPackage {
+            inherit pname;
+            version = "0.1.0";
+            src = rustSrc;
+            cargoLock.lockFile = ./Cargo.lock;
+            cargoBuildFlags = [
+              "--package"
+              crate
+            ];
+            # The tests run in `checks.tests`.
+            doCheck = false;
+            # SQLite from its bundled source, as in `cargoCheck` above (a
+            # setup hook sets the variable, so override it just before).
+            preBuild = "export LIBSQLITE3_SYS_USE_PKG_CONFIG=0";
+            meta = {
+              inherit description;
+              license = with pkgs.lib.licenses; [
+                mit
+                asl20
+              ];
+              mainProgram = pname;
+            };
+          };
       in
       {
         # `nix build` / `nix run . -- help`: the `bougette` command-line
-        # client.
-        packages.default = pkgs.rustPlatform.buildRustPackage {
-          pname = "bougette";
-          version = "0.1.0";
-          src = rustSrc;
-          cargoLock.lockFile = ./Cargo.lock;
-          cargoBuildFlags = [
-            "--package"
-            "bougette-cli"
-          ];
-          # The tests run in `checks.tests`.
-          doCheck = false;
-          # SQLite from its bundled source, as in `cargoCheck` above (a
-          # setup hook sets the variable, so override it just before).
-          preBuild = "export LIBSQLITE3_SYS_USE_PKG_CONFIG=0";
-          meta = {
-            description = "Command-line client of Bougette, a local-first budget app";
-            license = with pkgs.lib.licenses; [
-              mit
-              asl20
-            ];
-            mainProgram = "bougette";
-          };
-        };
+        # client; `nix run .#server -- ...`: the server.
+        packages.default =
+          binary "bougette" "bougette-cli"
+            "Command-line client of Bougette, a local-first budget app";
+        packages.server =
+          binary "bougette-server" "bougette-server"
+            "Server of Bougette: keeps and passes on the devices' changes";
 
         # `nix develop`: the Rust toolchain from nixpkgs, pinned by
         # flake.lock. Flutter and the Android targets come with the first

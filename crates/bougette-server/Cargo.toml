@@ -1,0 +1,14 @@
+[package]
+name = "bougette-server"
+description = "Bougette's server: an always-online device that keeps and passes on changes"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# No dependency on bougette-core: the server keeps and passes on messages,
+# it never reads budgets (and from M2 it can't: they'll be encrypted).
+[dependencies]
+bougette-store = { path = "../bougette-store" }
+bougette-sync = { path = "../bougette-sync" }
+tokio = { version = "1.54", features = ["rt", "net", "time"] }

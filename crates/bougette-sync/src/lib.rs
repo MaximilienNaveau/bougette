@@ -196,6 +196,31 @@ mod tests {
         );
     }
 
+    // The server as a mailbox: the laptop and the phone are never online
+    // together, yet the phone gets what the laptop wrote.
+    #[tokio::test]
+    async fn the_server_passes_changes_on() {
+        let (laptop, groceries) = store_with("Courses");
+        let (phone, _) = store_with("Voyage");
+        let server = Mutex::new(Store::open_in_memory().unwrap());
+        sync(&laptop, &server).await;
+        sync(&phone, &server).await;
+        assert_eq!(lock(&phone).load(groceries.id).unwrap(), Some(groceries));
+        // And the laptop gets the phone's budget on its next sync.
+        let (back, _) = sync(&laptop, &server).await;
+        assert_eq!(
+            back,
+            Summary {
+                sent: 0,
+                received: 3
+            }
+        );
+        assert_eq!(
+            lock(&laptop).versions().unwrap(),
+            lock(&phone).versions().unwrap()
+        );
+    }
+
     #[tokio::test]
     async fn refuses_garbage() {
         let (store, _) = store_with("Courses");
