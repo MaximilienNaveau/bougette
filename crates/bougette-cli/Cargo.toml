@@ -16,6 +16,8 @@ path = "src/main.rs"
 bougette-core = { path = "../bougette-core" }
 bougette-store = { path = "../bougette-store" }
 bougette-sync = { path = "../bougette-sync" }
+# The identifiers and addresses of devices, for the network commands.
+iroh = { version = "1.4", default-features = false, features = ["tls-ring"] }
 # Dates, plus the system time zone to know today's date where the user is:
 # "tz-system" finds the zone, "tzdb-zoneinfo" reads its rules from
 # /usr/share/zoneinfo. No time zone data is bundled.

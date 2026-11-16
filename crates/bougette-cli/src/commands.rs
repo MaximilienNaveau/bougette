@@ -6,14 +6,16 @@ use std::collections::HashMap;
 use std::num::NonZeroU8;
 
 use bougette_core::budget::{Budget, BudgetError, Comparison, Status};
+use bougette_core::id::{BudgetId, MemberId};
 use bougette_core::line::{Kind, Line, LineError, View};
 use bougette_core::money::{Currency, Money};
 use bougette_core::month::Month;
 use bougette_core::pot::{Goal, Pot};
 use bougette_core::schedule::Schedule;
+use bougette_core::shared::reflections;
 use bougette_core::split::{SplitRule, split};
 use bougette_core::transaction::{PotMove, Transaction};
-use bougette_store::{Store, StoreError};
+use bougette_store::{Role, Store, StoreError};
 use jiff::civil::Date;
 
 /// The help text. `\` at the end of a line continues the string without
@@ -24,6 +26,8 @@ Usage: bougette [--db FILE] [--today DATE] COMMAND
 Budgets
   budgets                          list them, with their balances
   budget new NAME [CURRENCY]       EUR by default, fixed for good
+  budget personal BUDGET           yours: your contributions, advances and
+                                   repayments in shared budgets show in it
   show BUDGET [MONTH]              a month: plan, actual, forecast, pots
   year BUDGET [YEAR]               the balances, month by month
 
@@ -37,17 +41,40 @@ Lines (the plan)
 Transactions (the actual)
   tx add BUDGET DATE income|cost AMOUNT CATEGORY [--line LINE]
          [--into POT | --from POT] [--note TEXT]
+         [--payer MEMBER]  paid by a member: a contribution if an income,
+                           an advance if a cost
+         [--payee MEMBER]  a cost paid to a member, e.g. a repayment
   tx list BUDGET [MONTH]
   tx remove BUDGET TRANSACTION
 
 Pots
   pot add BUDGET NAME [GOAL [BY]]
 
-Devices (sync)
-  id                               this device's identifier
-  serve --allow ID[,ID...] [--port PORT]
-                                   wait for those devices to sync, forever
-  sync ADDRESS                     sync with a serving device (ID@IP:PORT)
+Members
+  name NAME                        how you appear to the other members
+  members BUDGET                   who is in it, with which role
+  invite BUDGET [--role admin|editor|reader] [--days N]
+                                   an invitation to give (editor, 7 days)
+  accept INVITATION [--username NAME]
+                                   ask to join; NAME on the server if new
+  role BUDGET MEMBER admin|editor|reader
+  remove BUDGET MEMBER             they keep what they had, nothing new
+  leave BUDGET
+
+Devices and server
+  id                               this device's and member's identifiers
+  server join ADDRESS TOKEN USERNAME
+                                   with an invitation from the operator
+  sync [ADDRESS]                   with the server, or with your device at
+                                   ADDRESS (ID@IP:PORT)
+  serve [--port PORT]              let your other devices sync with this one
+  device code                      the secret to link another device
+  device link CODE                 make this new device one of yours
+  recovery setup [--phrase TEXT]   lock a backup on the server with a
+                                   recovery phrase (generated if not given)
+  recover ADDRESS TOKEN USERNAME PHRASE...
+                                   after losing all your devices, with a new
+                                   invitation from the operator
 
 Fair-split calculator (stores nothing)
   split TOTAL|BUDGET INCOME... [--rule income|equal] [--month MONTH]
@@ -55,14 +82,16 @@ Fair-split calculator (stores nothing)
 
 SCHEDULE: monthly, quarterly, yearly, every-N-months, weekly or once, with
 FIRST its first due date. Dates are written 2026-11-16, months 2026-11.
-BUDGET, LINE, POT, TRANSACTION: a name, or the end of an identifier.
+BUDGET, LINE, POT, TRANSACTION, MEMBER: a name, or the end of an
+identifier; MEMBER can also be me.
 Amounts: 12, 12.5 or -12.34 (a negative cost is a refund).
 Database: --db FILE, or $XDG_DATA_HOME/bougette/bougette.sqlite.
 ";
 
 /// The options, each followed by a value.
-const OPTIONS: [&str; 11] = [
-    "db", "today", "month", "pot", "line", "into", "from", "note", "rule", "allow", "port",
+const OPTIONS: [&str; 16] = [
+    "db", "today", "month", "pot", "line", "into", "from", "note", "rule", "port", "payer",
+    "payee", "role", "days", "username", "phrase",
 ];
 
 /// What every command may need.
@@ -116,6 +145,34 @@ pub fn run(words: &[&str], options: &Options, context: &mut Context) -> Result<S
         ["budgets"] => budgets(context),
         ["budget", "new", name] => new_budget(context, name, "EUR"),
         ["budget", "new", name, currency] => new_budget(context, name, currency),
+        ["budget", "personal", budget] => edit(context, budget, |budget| {
+            budget.personal = true;
+            Ok(format!("{} is your personal budget.\n", budget.name))
+        }),
+        ["name", name] => {
+            stored(context.store.set_name(name))?;
+            Ok(format!("You appear as {name} in your budgets.\n"))
+        }
+        ["members", budget] => list_members(context, budget),
+        ["role", budget, member, role] => {
+            let id = find_budget(context.store, budget)?.id;
+            let member = find_member(context, id, member)?;
+            let role = Role::parse(role).ok_or_else(|| format!("not a role: {role}"))?;
+            stored(context.store.set_role(id, &member.0, role))?;
+            Ok(format!("Role changed to {}.\n", role.as_str()))
+        }
+        ["remove", budget, member] => {
+            let id = find_budget(context.store, budget)?.id;
+            let member = find_member(context, id, member)?;
+            stored(context.store.remove(id, &member.0))?;
+            Ok("Removed. They keep what they had, and get nothing new.\n".to_string())
+        }
+        ["leave", budget] => {
+            let id = find_budget(context.store, budget)?.id;
+            let me = stored(context.store.member())?;
+            stored(context.store.remove(id, &me))?;
+            Ok("You left the budget.\n".to_string())
+        }
         ["show", budget] => show(context, budget, None),
         ["show", budget, month] => show(context, budget, Some(month)),
         ["year", budget] => year(context, budget, None),
@@ -182,28 +239,41 @@ pub fn run(words: &[&str], options: &Options, context: &mut Context) -> Result<S
             Ok(format!("Removed line {line}.\n"))
         }),
 
-        ["tx", "add", budget, day, kind, amount, category] => edit(context, budget, |budget| {
-            let mut transaction = Transaction::new(
-                parse_date(day)?,
-                parse_kind(kind)?,
-                parse_amount(amount, budget.currency())?,
-                *category,
-                None,
-            );
-            if let Some(line) = option("line") {
-                transaction.line = Some(find_line(budget, line)?.id);
-            }
-            // Matching a tuple of two Options covers the four cases.
-            transaction.pot = match (option("into"), option("from")) {
-                (None, None) => None,
-                (Some(pot), None) => Some(PotMove::Into(find_pot(budget, pot)?.id)),
-                (None, Some(pot)) => Some(PotMove::PaidFrom(find_pot(budget, pot)?.id)),
-                (Some(_), Some(_)) => return Err("use --into or --from, not both".into()),
-            };
-            transaction.note = option("note").unwrap_or_default().to_string();
-            let id = budget.add_transaction(transaction).map_err(explain)?;
-            Ok(format!("Added transaction {}.\n", short(id)))
-        }),
+        ["tx", "add", budget, day, kind, amount, category] => {
+            // The members are resolved first: the closure below only sees
+            // the budget, not the store.
+            let id = find_budget(context.store, budget)?.id;
+            let payer = option("payer")
+                .map(|member| find_member(context, id, member))
+                .transpose()?;
+            let payee = option("payee")
+                .map(|member| find_member(context, id, member))
+                .transpose()?;
+            edit(context, budget, |budget| {
+                let mut transaction = Transaction::new(
+                    parse_date(day)?,
+                    parse_kind(kind)?,
+                    parse_amount(amount, budget.currency())?,
+                    *category,
+                    None,
+                );
+                if let Some(line) = option("line") {
+                    transaction.line = Some(find_line(budget, line)?.id);
+                }
+                // Matching a tuple of two Options covers the four cases.
+                transaction.pot = match (option("into"), option("from")) {
+                    (None, None) => None,
+                    (Some(pot), None) => Some(PotMove::Into(find_pot(budget, pot)?.id)),
+                    (None, Some(pot)) => Some(PotMove::PaidFrom(find_pot(budget, pot)?.id)),
+                    (Some(_), Some(_)) => return Err("use --into or --from, not both".into()),
+                };
+                transaction.note = option("note").unwrap_or_default().to_string();
+                transaction.payer = payer;
+                transaction.payee = payee;
+                let id = budget.add_transaction(transaction).map_err(explain)?;
+                Ok(format!("Added transaction {}.\n", short(id)))
+            })
+        }
         ["tx", "list", budget] => list_transactions(context, budget, None),
         ["tx", "list", budget, month] => list_transactions(context, budget, Some(month)),
         ["tx", "remove", budget, transaction] => edit(context, budget, |budget| {
@@ -245,8 +315,9 @@ fn edit(
 fn new_budget(context: &mut Context, name: &str, currency: &str) -> Result<String, String> {
     let currency =
         Currency::from_code(currency).ok_or_else(|| format!("not a currency code: {currency}"))?;
-    let budget = Budget::new(name, currency);
-    stored(context.store.save(&budget))?;
+    // The store gives the budget its identifier, derived from its
+    // creator's key.
+    let budget = stored(context.store.create(Budget::new(name, currency)))?;
     Ok(format!("Created budget {name} ({}).\n", short(budget.id)))
 }
 
@@ -297,8 +368,22 @@ fn budgets(context: &mut Context) -> Result<String, String> {
 
 /// One month of a budget: each line planned and actual, the unplanned
 /// transactions, the totals, the running balance and the pots.
-fn show(context: &Context, name: &str, month: Option<&str>) -> Result<String, String> {
-    let budget = find_budget(context.store, name)?;
+fn show(context: &mut Context, name: &str, month: Option<&str>) -> Result<String, String> {
+    let mut budget = find_budget(context.store, name)?;
+    // A personal budget shows what its member paid or received in the
+    // shared ones (computed here, never saved).
+    if budget.personal {
+        let me = MemberId(stored(context.store.member())?);
+        let mut reflected = Vec::new();
+        for (id, _) in stored(context.store.budgets())? {
+            if id != budget.id
+                && let Some(shared) = stored(context.store.load(id))?
+            {
+                reflected.extend(reflections(&shared, &me));
+            }
+        }
+        budget = budget.with_reflections(reflected);
+    }
     let month = match month {
         Some(month) => parse_month(month)?,
         None => Month::of(context.today),
@@ -612,7 +697,41 @@ fn pick<'a, T>(
     }
 }
 
-fn find_budget(store: &Store, name: &str) -> Result<Budget, String> {
+/// The members of budget `id`, each with role and name.
+fn list_members(context: &mut Context, name: &str) -> Result<String, String> {
+    let id = find_budget(context.store, name)?.id;
+    let me = stored(context.store.member())?;
+    let mut out = String::new();
+    for member in stored(context.store.members(id))? {
+        out += &format!(
+            "{}  {:<20} {}{}\n",
+            short(&member.id),
+            member.name.as_deref().unwrap_or("(no name yet)"),
+            member.role.as_str(),
+            if member.id == me { ", you" } else { "" }
+        );
+    }
+    Ok(out)
+}
+
+/// The member of budget `id` called `name`: "me", a display name, or the
+/// end of their identifier.
+fn find_member(context: &mut Context, id: BudgetId, name: &str) -> Result<MemberId, String> {
+    if name == "me" {
+        return Ok(MemberId(stored(context.store.member())?));
+    }
+    let members = stored(context.store.members(id))?;
+    let member = pick(
+        &members,
+        name,
+        "member",
+        |member| member.id.clone(),
+        |member| member.name.as_deref().unwrap_or_default(),
+    )?;
+    Ok(MemberId(member.id.clone()))
+}
+
+pub(crate) fn find_budget(store: &Store, name: &str) -> Result<Budget, String> {
     let budgets = stored(store.budgets())?;
     let (id, _) = pick(
         &budgets,
@@ -656,9 +775,13 @@ fn find_transaction<'a>(budget: &'a Budget, name: &str) -> Result<&'a Transactio
 }
 
 /// A storage error as text.
-fn stored<T>(result: Result<T, StoreError>) -> Result<T, String> {
-    // `{:?}` uses the derived Debug formatting.
-    result.map_err(|error| format!("storage: {error:?}"))
+pub(crate) fn stored<T>(result: Result<T, StoreError>) -> Result<T, String> {
+    result.map_err(|error| match error {
+        StoreError::NotAllowed(reason) => reason,
+        StoreError::NoKey => "this device has no key of this budget yet: sync first".to_string(),
+        // `{:?}` uses the derived Debug formatting.
+        other => format!("storage: {other:?}"),
+    })
 }
 
 /// Why the budget refused, in words.
@@ -970,5 +1093,38 @@ mod tests {
         );
         assert!(error(&mut store, "show Household --colour yes").contains("unknown option"));
         assert!(error(&mut store, "frobnicate").contains("unknown command"));
+    }
+
+    #[test]
+    fn a_personal_budget_shows_what_was_paid_in_shared_ones() {
+        let mut store = household();
+        all(
+            &mut store,
+            &[
+                "name Alice",
+                "tx add Household 2026-11-03 income 1000 Contributions --payer me",
+                "tx add Household 2026-11-08 cost 42 Food --payer Alice --note market",
+                "budget new Alice",
+                "budget personal Alice",
+            ],
+        );
+        let members = bougette(&mut store, "members Household").unwrap();
+        assert!(members.contains("Alice"), "{members}");
+        assert!(members.contains("admin, you"), "{members}");
+        let mine = bougette(&mut store, "show Alice 2026-11").unwrap();
+        // Both show as costs of Alice's own budget, in its "Household"
+        // category: 1,042 in all.
+        assert!(mine.contains("Household, Contributions: "), "{mine}");
+        assert!(mine.contains("Household, Food: market"), "{mine}");
+        // The totals' row, not the "Costs" heading of the lines; `row`
+        // skips two words, the label and the due amount (0) here.
+        let totals = mine.split("Totals").nth(1).unwrap();
+        assert_eq!(row(totals, "Costs"), ["0.00", "1042.00", "over", "1042.00"]);
+        // An unknown member is refused.
+        let error = bougette(
+            &mut store,
+            "tx add Household 2026-11-08 cost 1 Food --payer Bob",
+        );
+        assert!(error.unwrap_err().contains("no member Bob"));
     }
 }

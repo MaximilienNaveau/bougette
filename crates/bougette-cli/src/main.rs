@@ -54,9 +54,9 @@ fn try_main(arguments: Vec<String>) -> Result<String, String> {
     // with slice patterns. `String::as_str` is a function used as a
     // closure.
     let words: Vec<&str> = words.iter().map(String::as_str).collect();
-    // `matches!` with alternatives `|`: the commands that talk to other
-    // devices take the store itself, to share it between tasks.
-    if matches!(words.as_slice(), ["id"] | ["serve"] | ["sync", _]) {
+    // The commands that talk to other devices take the store itself, to
+    // share it between tasks.
+    if network::handles(&words) {
         return network::run(&words, &options, store);
     }
     let today = match options.get("today") {
