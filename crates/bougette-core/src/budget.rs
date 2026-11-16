@@ -125,6 +125,33 @@ pub enum BudgetError {
     PayeeNeedsACost,
 }
 
+/// The reason, in words, as shown to people (`{}` in `format!`).
+impl std::fmt::Display for BudgetError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let reason = match self {
+            BudgetError::WrongCurrency => "the amount isn't in the budget's currency",
+            BudgetError::UnknownLine => "no such line",
+            BudgetError::UnknownPot => "no such pot",
+            BudgetError::KindMismatch => "an income can't realise a cost line, nor the reverse",
+            BudgetError::PotNeedsACost => "only costs move money into or out of a pot",
+            BudgetError::PotMismatch => {
+                "a transaction on an allocation line goes into that line's pot"
+            }
+            BudgetError::UnknownTransaction => "no such transaction",
+            BudgetError::LineInUse => {
+                "the line has transactions: remove them first, or end the line"
+            }
+            BudgetError::Line(LineError::BeforeStart) => "the date is before the line starts",
+            BudgetError::Line(LineError::NotPositive) => "a line's amount must be positive",
+            BudgetError::PayeeNeedsACost => {
+                "only a cost can be paid to a member, and not by a member"
+            }
+        };
+        // `write!` into the formatter, like `os << reason`.
+        write!(f, "{reason}")
+    }
+}
+
 // Lets `?` turn a LineError into a BudgetError (see bougette-store's
 // StoreError for the same pattern).
 impl From<LineError> for BudgetError {

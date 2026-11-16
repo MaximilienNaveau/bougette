@@ -7,7 +7,7 @@ use std::num::NonZeroU8;
 
 use bougette_core::budget::{Budget, BudgetError, Comparison, Status};
 use bougette_core::id::{BudgetId, MemberId};
-use bougette_core::line::{Kind, Line, LineError, View};
+use bougette_core::line::{Kind, Line, View};
 use bougette_core::money::{Currency, Money};
 use bougette_core::month::Month;
 use bougette_core::pot::{Goal, Pot};
@@ -786,22 +786,13 @@ pub(crate) fn stored<T>(result: Result<T, StoreError>) -> Result<T, String> {
 
 /// Why the budget refused, in words.
 fn explain(error: BudgetError) -> String {
-    let reason = match error {
-        BudgetError::WrongCurrency => "the amount isn't in the budget's currency",
-        BudgetError::UnknownLine => "no such line",
-        BudgetError::UnknownPot => "no such pot",
-        BudgetError::KindMismatch => "an income can't realise a cost line, nor the reverse",
-        BudgetError::PotNeedsACost => "only costs move money into or out of a pot",
+    // The core words it (`Display`); the CLI adds the option to use.
+    match error {
         BudgetError::PotMismatch => {
-            "a transaction on an allocation line goes --into that line's pot"
+            "a transaction on an allocation line goes --into that line's pot".to_string()
         }
-        BudgetError::UnknownTransaction => "no such transaction",
-        BudgetError::LineInUse => "the line has transactions: remove them first, or end the line",
-        BudgetError::Line(LineError::BeforeStart) => "the date is before the line starts",
-        BudgetError::Line(LineError::NotPositive) => "a line's amount must be positive",
-        BudgetError::PayeeNeedsACost => "only a cost can be paid to a member, and not by a member",
-    };
-    reason.to_string()
+        other => other.to_string(),
+    }
 }
 
 pub fn parse_date(text: &str) -> Result<Date, String> {
