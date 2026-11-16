@@ -91,7 +91,7 @@ pub struct Store {
     replays: bool,
 }
 
-/// The database schema, version 2 (SQLite's `user_version`). `IF NOT
+/// The database schema, version 3 (SQLite's `user_version`). `IF NOT
 /// EXISTS` makes opening an existing file harmless.
 const SCHEMA: &str = "
     CREATE TABLE IF NOT EXISTS meta (
@@ -102,6 +102,7 @@ const SCHEMA: &str = "
         timestamp TEXT PRIMARY KEY,
         budget TEXT NOT NULL,
         author TEXT NOT NULL,
+        previous TEXT NOT NULL,
         key INTEGER,
         body BLOB NOT NULL,
         signature BLOB NOT NULL
@@ -131,7 +132,7 @@ const SCHEMA: &str = "
         expires INTEGER NOT NULL,
         used INTEGER NOT NULL DEFAULT 0
     );
-    PRAGMA user_version = 2;
+    PRAGMA user_version = 3;
 ";
 
 impl Store {
@@ -153,12 +154,12 @@ impl Store {
     }
 
     fn with_connection(connection: Connection, replays: bool) -> Result<Store, StoreError> {
-        // A database of M0 or M1 (version 0, with tables) has another
-        // layout: refuse it rather than misread it.
+        // A database of an earlier version (M0 and M1: 0, M2: 2) has
+        // another layout: refuse it rather than misread it.
         let version: i64 = connection.query_row("PRAGMA user_version", [], |row| row.get(0))?;
         let tables: i64 =
             connection.query_row("SELECT COUNT(*) FROM sqlite_master", [], |row| row.get(0))?;
-        if version != 2 && tables > 0 {
+        if version != 3 && tables > 0 {
             return Err(Corrupt(
                 "this database comes from an older version of Bougette: start a new one".into(),
             )
@@ -355,6 +356,19 @@ impl Store {
             .iter()
             .rev()
             .find_map(|number| keys.get(number).map(|key| (*number, *key)));
+        // The last message of this device in this budget: the next one
+        // links to it.
+        let node = self.setting("node")?.unwrap_or_default();
+        let mut previous = self
+            .messages_where(
+                "budget = ?1 AND substr(timestamp, 23) = ?2 \
+                 AND timestamp = (SELECT MAX(timestamp) FROM messages \
+                 WHERE budget = ?1 AND substr(timestamp, 23) = ?2)",
+                &[budget, &node],
+            )?
+            .first()
+            .map(Message::hash)
+            .unwrap_or_default();
         // All or nothing: a SQLite transaction, committed at the end. If
         // anything fails before, `transaction` is dropped and rolls back,
         // like an RAII guard.
@@ -364,12 +378,14 @@ impl Store {
                 &identity,
                 self.clock.tick(),
                 budget.to_string(),
+                previous,
                 change,
                 // `as_ref().map(...)`: borrow the key inside the Option.
                 current.as_ref().map(|(number, key)| (*number, key)),
             )
             .ok_or(StoreError::NoKey)?;
             insert(&transaction, &message)?;
+            previous = message.hash();
         }
         transaction.commit()?;
         self.rebuild(budget)
@@ -419,11 +435,16 @@ impl Store {
         Ok(rows.collect::<Result<Vec<String>, _>>()?)
     }
 
-    /// The access of budget `budget`, as of all its access changes held.
+    /// The access of budget `budget`, as of all its access changes held
+    /// (but those cut off, see `access::cut_off`).
     pub fn access(&self, budget: &str) -> Result<Access, StoreError> {
+        let messages = self.messages_where("budget = ?1", &[budget])?;
+        let excluded = access::cut_off(budget, &messages);
         let mut access = Access::default();
-        for message in self.messages_where("budget = ?1 AND key IS NULL", &[budget])? {
-            if let Body::Clear(change) = &message.body {
+        for (position, message) in messages.iter().enumerate() {
+            if let Body::Clear(change) = &message.body
+                && !excluded.contains(&position)
+            {
                 access.apply(budget, &message.author, &message.timestamp, change);
             }
         }
@@ -536,12 +557,16 @@ impl Store {
                 }
             }
         }
-        // Second pass: everything, in order.
+        // Second pass: everything, in order, but what was cut off.
         let keys = self.keys(budget)?;
+        let excluded = access::cut_off(budget, &messages);
         let transaction = self.connection.transaction()?;
         transaction.execute("DELETE FROM fields WHERE budget = ?1", params![budget])?;
         let mut access = Access::default();
-        for message in &messages {
+        for (position, message) in messages.iter().enumerate() {
+            if excluded.contains(&position) {
+                continue;
+            }
             if let Body::Clear(change) = &message.body {
                 access.apply(budget, &message.author, &message.timestamp, change);
                 continue;
@@ -578,7 +603,7 @@ impl Store {
     /// bound to `values`, in timestamp order.
     fn messages_where(&self, filter: &str, values: &[&str]) -> Result<Vec<Message>, StoreError> {
         let mut statement = self.connection.prepare(&format!(
-            "SELECT timestamp, budget, author, key, body, signature
+            "SELECT timestamp, budget, author, previous, key, body, signature
              FROM messages WHERE {filter} ORDER BY timestamp"
         ))?;
         // `params_from_iter` binds the values of a list, however many.
@@ -587,20 +612,22 @@ impl Store {
                 row.get::<_, String>(0)?,
                 row.get::<_, String>(1)?,
                 row.get::<_, String>(2)?,
-                row.get::<_, Option<u32>>(3)?,
-                row.get::<_, Vec<u8>>(4)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, Option<u32>>(4)?,
                 row.get::<_, Vec<u8>>(5)?,
+                row.get::<_, Vec<u8>>(6)?,
             ))
         })?;
         let mut messages = Vec::new();
         for row in rows {
-            let (timestamp, budget, author, key, body, signature) = row?;
+            let (timestamp, budget, author, previous, key, body, signature) = row?;
             let body = Message::body_from(key, body)
                 .ok_or_else(|| Corrupt(format!("invalid message {timestamp:?}")))?;
             messages.push(Message {
                 timestamp,
                 budget,
                 author,
+                previous,
                 body,
                 signature,
             });
@@ -677,12 +704,14 @@ fn insert(connection: &Connection, message: &Message) -> Result<bool, StoreError
     let (key, body) = message.stored_body();
     // `execute` returns the number of rows changed: 0 if already there.
     let inserted = connection.execute(
-        "INSERT OR IGNORE INTO messages (timestamp, budget, author, key, body, signature)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        "INSERT OR IGNORE INTO messages
+         (timestamp, budget, author, previous, key, body, signature)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         params![
             message.timestamp,
             message.budget,
             message.author,
+            message.previous,
             key,
             body,
             message.signature

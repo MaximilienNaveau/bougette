@@ -6,8 +6,8 @@
 //! - a list: its length (a number), then its items.
 //!
 //! A version vector is a list of (budget, device, timestamp); a message is
-//! its timestamp, budget and author (texts), key number (optional), body
-//! and signature (byte strings).
+//! its timestamp, budget, author and previous hash (texts), key number
+//! (optional), body and signature (byte strings).
 
 use bougette_store::{Message, Versions};
 // The `...Ext` traits add helper methods (`read_u32`, `write_all`...) to
@@ -55,6 +55,7 @@ pub async fn write_messages<W: AsyncWrite + Unpin>(
         write_text(writer, &message.timestamp).await?;
         write_text(writer, &message.budget).await?;
         write_text(writer, &message.author).await?;
+        write_text(writer, &message.previous).await?;
         let (key, body) = message.stored_body();
         match key {
             None => writer.write_u8(0).await?,
@@ -80,6 +81,7 @@ pub async fn read_messages<R: AsyncRead + Unpin>(
         let timestamp = read_text(reader).await?;
         let budget = read_text(reader).await?;
         let author = read_text(reader).await?;
+        let previous = read_text(reader).await?;
         let key = match reader.read_u8().await? {
             0 => None,
             1 => Some(reader.read_u32().await?),
@@ -91,6 +93,7 @@ pub async fn read_messages<R: AsyncRead + Unpin>(
             timestamp,
             budget,
             author,
+            previous,
             body,
             signature: read_bytes(reader).await?,
         });

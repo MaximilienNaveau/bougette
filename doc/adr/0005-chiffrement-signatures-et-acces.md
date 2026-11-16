@@ -18,6 +18,10 @@ Ce qui met en œuvre l'[ADR 0003](0003-identite-et-recuperation.md), avec des pr
   - une **clé de preuve**, qui sert à la demande d'adhésion (HMAC de l'identifiant et de la clé de réception du nouveau membre).
 
   Le serveur ne voit jamais la clé de preuve : il ne peut pas fabriquer une demande valable pour un membre de son choix. L'appareil de l'Admin qui a créé l'invitation accepte seul la demande, à sa prochaine synchronisation.
+- **Chaîne par appareil contre l'antidatage** : l'horodatage est choisi par l'appareil qui écrit, donc un membre retiré à midi pourrait dater un changement de 11 h 59.
+  - Chaque message nomme le hachage du message précédent du même appareil dans le même budget. Ce champ est signé : personne ne peut insérer un message dans le passé d'une chaîne.
+  - Un changement de rôle (attribution, changement, retrait) nomme les hachages des derniers messages du membre que son auteur avait reçus, appareil par appareil.
+  - Au rejeu, un message de ce membre daté d'avant le changement ne compte que s'il fait partie de ces chaînes ; daté d'après, il est jugé avec le nouveau rôle. Un message antidaté n'y est pas : il est ignoré (`access::cut_off`).
 - **Appareils** : un appareil prouve qu'il appartient à un membre avec la signature, par ce membre, de son identifiant iroh. iroh authentifie déjà cet identifiant pendant la poignée de main TLS.
 - **Serveur** : il garde les messages et les sauvegardes, et transmet à chaque appareil les budgets dont son membre fait partie. L'opérateur gère les noms d'utilisateur et les appareils (`invite`, `revoke`, `list`).
 - **Sauvegarde** : la graine, le nom affiché et toutes les clés de budget, chiffrés avec une clé tirée de la phrase de récupération par Argon2id (64 Mio, 3 passes, sel aléatoire ; paramètres stockés avec la sauvegarde).
@@ -30,9 +34,9 @@ Les identifiants de budget, les horodatages, les auteurs (clés publiques), les 
 
 ## Limites connues
 
-- **Horodatages antidatés** : l'horodatage est choisi par l'appareil qui écrit. Un membre retiré, ou un Éditeur rétrogradé, peut antidater ses messages pour qu'ils tombent avant son retrait, et ils comptent alors.
-  - Remède envisagé : n'accepter d'un auteur que des messages postérieurs au dernier qu'on a déjà de lui, ou faire contresigner le retrait par un vecteur de versions.
-  - En attendant, un message antidaté ne peut pas tomber avant le dernier message de l'Admin qui l'a retiré, s'il est déjà reçu ; mais ce n'est pas garanti.
+- **Changements d'un membre retiré encore en route** : ceux qu'il a faits juste avant son retrait, mais que l'Admin n'avait pas encore reçus, sont écartés avec les messages antidatés. On perd des changements légitimes plutôt que d'en accepter de faux.
+- **Appareil inconnu de l'Admin** : la coupure ne nomme que les appareils du membre dont l'Admin a reçu des messages. Ceux d'un autre appareil, datés d'avant le changement, sont jugés avec le nouveau rôle : écartés après un retrait, acceptés après une promotion.
+- **Coupures elles-mêmes** : les changements de rôle valides sont déterminés par un premier rejeu, qui ne tient pas encore compte des coupures. Un Admin retiré qui antidaterait un changement de rôle pourrait donc influencer ce premier rejeu, sans que son changement compte au final. C'est un cas étroit : il faudrait un point fixe pour le fermer.
 - **Pas de confidentialité persistante** (*forward secrecy*) dans un budget : une clé couvre tout jusqu'au prochain départ d'un membre.
 - **Clés en clair sur l'appareil**, dans sa base SQLite : leur protection est celle du système (chiffrement du disque, verrouillage).
 - **Seul l'appareil qui a créé une invitation peut l'accepter** : si cet appareil est perdu avant, il faut en refaire une.

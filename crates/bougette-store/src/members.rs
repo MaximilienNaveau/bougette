@@ -78,12 +78,24 @@ pub(crate) fn seal_key(
     ))
 }
 
-fn role_change(member: &str, role: Option<(Role, &str)>) -> Change {
+/// The change giving `member` a role, or removing them (`None`), with
+/// `tips`: the hashes of their latest messages received here (see
+/// `access::cut_off`).
+fn role_change(member: &str, role: Option<(Role, &str)>, tips: &[String]) -> Change {
+    let (role, receiving_key) = match role {
+        Some((role, receiving_key)) => (role.as_str(), receiving_key),
+        None => ("none", "-"),
+    };
+    let cutoff = if tips.is_empty() {
+        "-".to_string()
+    } else {
+        tips.join(",")
+    };
     Change::new(
         ACCESS,
         format!("member/{member}"),
         "role",
-        role.map(|(role, receiving_key)| format!("{} {receiving_key}", role.as_str())),
+        Some(format!("{role} {receiving_key} {cutoff}")),
     )
 }
 
@@ -190,7 +202,8 @@ impl Store {
                 "a budget keeps at least one Admin: promote someone else first".into(),
             ));
         }
-        let change = role_change(member, Some((role, &current.receiving_key)));
+        let tips = self.tips(&budget, member)?;
+        let change = role_change(member, Some((role, &current.receiving_key)), &tips);
         self.write(&budget, vec![change])
     }
 
@@ -212,7 +225,8 @@ impl Store {
                 "a budget keeps at least one Admin: promote someone else first".into(),
             ));
         }
-        self.write(&budget, vec![role_change(member, None)])?;
+        let tips = self.tips(&budget, member)?;
+        self.write(&budget, vec![role_change(member, None, &tips)])?;
         // When leaving, someone else draws the new key (in `follow_up`).
         if member != me {
             self.new_key(&budget)?;
@@ -291,7 +305,12 @@ impl Store {
             }
             // The role, then every key we hold, so the newcomer reads the
             // whole history.
-            let mut changes = vec![role_change(member, Some((role, &request.receiving_key)))];
+            let tips = self.tips(budget, member)?;
+            let mut changes = vec![role_change(
+                member,
+                Some((role, &request.receiving_key)),
+                &tips,
+            )];
             for (number, key) in self.keys(budget)? {
                 if let Some(change) = seal_key(member, &request.receiving_key, number, &key) {
                     changes.push(change);
@@ -317,6 +336,19 @@ impl Store {
             .filter_map(|(member, info)| seal_key(member, &info.receiving_key, number, &key))
             .collect();
         self.write(budget, changes)
+    }
+
+    /// The hashes of `member`'s latest message in `budget` from each of
+    /// their devices, as received here.
+    fn tips(&self, budget: &str, member: &str) -> Result<Vec<String>, StoreError> {
+        // Messages come in timestamp order: the last one seen of each
+        // device wins. The device is the end of the timestamp.
+        let mut latest = std::collections::BTreeMap::new();
+        for message in self.messages_where("budget = ?1 AND author = ?2", &[budget, member])? {
+            let node = message.timestamp.get(22..).unwrap_or_default().to_string();
+            latest.insert(node, message.hash());
+        }
+        Ok(latest.into_values().collect())
     }
 
     fn member_name(&self, budget: &str, member: &str) -> Result<Option<String>, StoreError> {
@@ -493,5 +525,57 @@ mod tests {
             alice.versions().unwrap().len(),
             Versions::len(&bob.versions().unwrap())
         );
+    }
+
+    #[test]
+    fn a_removed_member_cannot_slip_in_a_backdated_change() {
+        use crate::crypto::Identity;
+        use crate::message::{Change, Message};
+        let mut alice = Store::open_in_memory().unwrap();
+        let mut bob = Store::open_in_memory().unwrap();
+        let mut budget = alice.create(Budget::new("Home", Currency::EUR)).unwrap();
+        let invitation = alice.invite(budget.id, Role::Editor, LATER).unwrap();
+        send(&alice, &mut bob);
+        bob.request_join(&invitation).unwrap();
+        send(&bob, &mut alice);
+        send(&alice, &mut bob);
+        budget.name = "Bob's name".to_string();
+        bob.save(&budget).unwrap();
+        send(&bob, &mut alice);
+        let bob_id = bob.member().unwrap();
+        alice.remove(budget.id, &bob_id).unwrap();
+
+        // Bob forges a change dated between his last one and his removal:
+        // the removal's millisecond and counter, with the smallest device.
+        let id = budget.id.to_string();
+        let mine = |store: &Store, author: &str| {
+            store
+                .messages_where("budget = ?1 AND author = ?2", &[&id, author])
+                .unwrap()
+        };
+        let alice_id = alice.member().unwrap();
+        let removal = mine(&alice, &alice_id)
+            .into_iter()
+            .find(|m| {
+                matches!(&m.body, crate::Body::Clear(c) if c.id.starts_with("member/")
+                && c.value.as_deref().is_some_and(|v| v.starts_with("none")))
+            })
+            .unwrap();
+        let forged_time = format!("{}0000000000000000", &removal.timestamp[..22]);
+        let last = mine(&bob, &bob_id).pop().unwrap();
+        assert!(last.timestamp < forged_time && forged_time < removal.timestamp);
+        let (number, key) = bob.keys(&id).unwrap().into_iter().next().unwrap();
+        let identity = Identity::from_seed(bob.identity_seed().unwrap());
+        let forged = Message::new(
+            &identity,
+            forged_time,
+            id.clone(),
+            last.hash(),
+            Change::new("budget", id.as_str(), "name", Some("Backdated".into())),
+            Some((number, &key)),
+        )
+        .unwrap();
+        alice.receive(&[forged]).unwrap();
+        assert_eq!(alice.load(budget.id).unwrap().unwrap().name, "Bob's name");
     }
 }

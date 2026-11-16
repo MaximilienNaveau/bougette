@@ -8,18 +8,20 @@
 //! - `origin`: the creation. Valid only from the creator, the member whose
 //!   key, hashed with the change's nonce, gives the budget's identifier.
 //!   They become its first Admin. Value: `NONCE RECEIVING_KEY`.
-//! - `member/M`: M's role, `ROLE RECEIVING_KEY`, or nothing when M leaves.
-//!   Valid from an Admin, or from M leaving.
+//! - `member/M`: M's role, `ROLE RECEIVING_KEY CUTOFF`, or `none - CUTOFF`
+//!   when M leaves. Valid from an Admin, or from M leaving. CUTOFF lists
+//!   the hashes of M's latest messages its author had received (`-` for
+//!   none), see `cut_off`.
 //! - `key/M/N`: budget key number N, sealed for M. Valid from an Admin.
 //! - `join/M`: M asks to join with an invitation: `INVITATION PROOF
 //!   RECEIVING_KEY`. Valid from M only.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use uuid::Uuid;
 
 use crate::crypto;
-use crate::message::Change;
+use crate::message::{Body, Change, Message};
 
 /// What a member may do in a budget (GLOSSARY.md: Role).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -86,6 +88,9 @@ pub struct Access {
     /// Whether a member left after the latest key was announced: an Admin
     /// then draws a new key they don't get.
     pub needs_new_key: bool,
+    /// The valid role changes, in order: member, timestamp, and the hashes
+    /// of the member's messages known then (see `cut_off`).
+    pub cutoffs: Vec<(String, String, Vec<String>)>,
 }
 
 impl Access {
@@ -132,16 +137,18 @@ impl Access {
                 self.created = true;
                 self.add(author, Role::Admin, receiving_key);
             }
-            (["member", member], "role", [role, receiving_key]) if is_admin => {
+            (["member", member], "role", ["none", _, cutoff]) if is_admin || *member == author => {
+                if self.members.remove(*member).is_some() {
+                    self.needs_new_key = true;
+                }
+                self.cut(member, timestamp, cutoff);
+            }
+            (["member", member], "role", [role, receiving_key, cutoff]) if is_admin => {
                 let Some(role) = Role::parse(role) else {
                     return false;
                 };
                 self.add(member, role, receiving_key);
-            }
-            (["member", member], "role", [""]) if is_admin || *member == author => {
-                if self.members.remove(*member).is_some() {
-                    self.needs_new_key = true;
-                }
+                self.cut(member, timestamp, cutoff);
             }
             (["key", member, number], "key", [sealed]) if is_admin => {
                 let (Ok(number), Some(sealed)) = (number.parse(), crypto::from_hex(sealed)) else {
@@ -170,6 +177,15 @@ impl Access {
         true
     }
 
+    fn cut(&mut self, member: &str, timestamp: &str, cutoff: &str) {
+        let tips = match cutoff {
+            "-" => Vec::new(),
+            tips => tips.split(',').map(str::to_string).collect(),
+        };
+        self.cutoffs
+            .push((member.to_string(), timestamp.to_string(), tips));
+    }
+
     fn add(&mut self, member: &str, role: Role, receiving_key: &str) {
         self.members.insert(
             member.to_string(),
@@ -179,6 +195,53 @@ impl Access {
             },
         );
     }
+}
+
+/// The positions of the messages of a budget (in timestamp order) that
+/// don't count, because a role change cut them off (ADR 0005).
+///
+/// A message's timestamp is chosen by its author, so a member removed at
+/// noon could date a change 11:59. To prevent that, a role change records
+/// the hashes of the member's latest messages its author had received;
+/// with the `previous` links, they designate every earlier message of the
+/// member's devices. A message of the member dated *before* the change
+/// counts only if it is one of those; one dated after is judged with the
+/// new role, as usual.
+pub fn cut_off(budget: &str, messages: &[Message]) -> HashSet<usize> {
+    // The valid role changes, from a first replay of the access changes.
+    let mut access = Access::default();
+    for message in messages {
+        if let Body::Clear(change) = &message.body {
+            access.apply(budget, &message.author, &message.timestamp, change);
+        }
+    }
+    // Each message by hash, to walk the chains back.
+    let by_hash: HashMap<String, &Message> = messages
+        .iter()
+        .map(|message| (message.hash(), message))
+        .collect();
+    let mut excluded = HashSet::new();
+    for (member, timestamp, tips) in &access.cutoffs {
+        // Every message reached from the tips through `previous` links.
+        let mut known = HashSet::new();
+        let mut pending: Vec<&str> = tips.iter().map(String::as_str).collect();
+        while let Some(hash) = pending.pop() {
+            if let Some(message) = by_hash.get(hash)
+                && known.insert(hash.to_string())
+            {
+                pending.push(&message.previous);
+            }
+        }
+        for (position, message) in messages.iter().enumerate() {
+            if message.author == *member
+                && message.timestamp < *timestamp
+                && !known.contains(&message.hash())
+            {
+                excluded.insert(position);
+            }
+        }
+    }
+    excluded
 }
 
 /// The value of an `origin` change for a budget created by `identity`,
@@ -210,7 +273,7 @@ mod tests {
             ACCESS,
             format!("member/{}", member.member()),
             "role",
-            Some(format!("{role} {}", member.receiving_key())),
+            Some(format!("{role} {} -", member.receiving_key())),
         )
     }
 
@@ -240,7 +303,12 @@ mod tests {
         assert!(!access.may_write(&mallory.member(), &name));
 
         // Bob leaves on his own: a new key is then needed.
-        let leave = Change::new(ACCESS, format!("member/{}", bob.member()), "role", None);
+        let leave = Change::new(
+            ACCESS,
+            format!("member/{}", bob.member()),
+            "role",
+            Some("none - -".to_string()),
+        );
         assert!(access.apply(&budget, &bob.member(), "t5", &leave));
         assert_eq!(access.role(&bob.member()), None);
         assert!(access.needs_new_key);
@@ -263,5 +331,43 @@ mod tests {
         assert!(!access.apply(&budget, &alice.member(), "t2", &request));
         assert!(access.apply(&budget, &bob.member(), "t2", &request));
         assert_eq!(access.requests[&bob.member()].invitation, "inv");
+    }
+
+    #[test]
+    fn a_removed_member_cannot_backdate_changes() {
+        let alice = Identity::generate();
+        let bob = Identity::generate();
+        let (id, origin) = origin(&alice);
+        let budget = id.to_string();
+        let key: [u8; 32] = crypto::random();
+        // A message by `who` at `timestamp`, after `previous` (a hash).
+        let message = |who: &Identity, timestamp: &str, previous: &str, change: Change| {
+            Message::new(
+                who,
+                timestamp.into(),
+                budget.clone(),
+                previous.into(),
+                change,
+                Some((1, &key)),
+            )
+            .unwrap()
+        };
+        let name = |value: &str| Change::new("budget", &budget, "name", Some(value.into()));
+        let a1 = message(&alice, "t1", "", origin);
+        let a2 = message(&alice, "t2", &a1.hash(), grant(&bob, "editor"));
+        let b3 = message(&bob, "t3", "", name("Bob, before"));
+        // Alice removes Bob, having received b3.
+        let removal = Change::new(
+            ACCESS,
+            format!("member/{}", bob.member()),
+            "role",
+            Some(format!("none - {}", b3.hash())),
+        );
+        let a5 = message(&alice, "t5", &a2.hash(), removal);
+        // Bob, removed, dates a change t4: before his removal.
+        let b4 = message(&bob, "t4", &b3.hash(), name("Bob, backdated"));
+        let messages = [a1, a2, b3, b4, a5];
+        // Only b4 (position 3) is cut off.
+        assert_eq!(cut_off(&budget, &messages), HashSet::from([3]));
     }
 }

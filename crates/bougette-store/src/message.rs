@@ -76,6 +76,10 @@ pub struct Message {
     pub budget: String,
     /// The member who made it: their identifier (public key).
     pub author: String,
+    /// The hash of the previous message of the same device in the same
+    /// budget (empty for its first): each device's messages form a chain
+    /// nobody can insert into, see `access::cut_off` (ADR 0005).
+    pub previous: String,
     pub body: Body,
     /// The author's signature of everything above.
     pub signature: Vec<u8>,
@@ -88,6 +92,7 @@ impl Message {
         identity: &Identity,
         timestamp: String,
         budget: String,
+        previous: String,
         change: Change,
         key: Option<(u32, &[u8; 32])>,
     ) -> Option<Message> {
@@ -105,6 +110,7 @@ impl Message {
             timestamp,
             budget,
             author: identity.member(),
+            previous,
             body,
             signature: Vec::new(),
         };
@@ -158,16 +164,24 @@ impl Message {
         })
     }
 
+    /// The message's hash, which the next message of its device names as
+    /// `previous`. It covers what the signature covers, `previous`
+    /// included: changing an earlier message breaks every later link.
+    pub fn hash(&self) -> String {
+        crypto::hex(&crypto::sha256(&[&self.signed_bytes()]))
+    }
+
     /// What the signature covers: every field, each length-prefixed so
     /// that no two different messages give the same bytes.
     fn signed_bytes(&self) -> Vec<u8> {
         let (key, body) = self.stored_body();
         let mut writer = Writer::default();
         writer
-            .text("bougette message 1")
+            .text("bougette message 2")
             .text(&self.timestamp)
             .text(&self.budget)
-            .text(&self.author);
+            .text(&self.author)
+            .text(&self.previous);
         match key {
             None => writer.u32(0),
             Some(key) => writer.u32(1).u32(key),
@@ -197,22 +211,32 @@ mod tests {
     fn sealed_changes_need_the_key() {
         let alice = Identity::generate();
         let key: [u8; 32] = crypto::random();
-        let message =
-            Message::new(&alice, "t1".into(), "b".into(), rent(), Some((7, &key))).unwrap();
+        let message = Message::new(
+            &alice,
+            "t1".into(),
+            "b".into(),
+            String::new(),
+            rent(),
+            Some((7, &key)),
+        )
+        .unwrap();
         assert!(message.is_authentic());
         assert!(matches!(message.body, Body::Sealed { key: 7, .. }));
         assert_eq!(message.change(|_| Some(key)), Some(rent()));
         assert_eq!(message.change(|_| None), None);
         assert_eq!(message.change(|_| Some(crypto::random())), None);
         // Without a key, a content change can't be written at all.
-        assert!(Message::new(&alice, "t1".into(), "b".into(), rent(), None).is_none());
+        assert!(
+            Message::new(&alice, "t1".into(), "b".into(), String::new(), rent(), None).is_none()
+        );
     }
 
     #[test]
     fn tampering_breaks_the_signature() {
         let alice = Identity::generate();
         let grant = Change::new(ACCESS, "member/x", "role", Some("admin k".to_string()));
-        let message = Message::new(&alice, "t1".into(), "b".into(), grant, None).unwrap();
+        let message =
+            Message::new(&alice, "t1".into(), "b".into(), String::new(), grant, None).unwrap();
         assert!(matches!(message.body, Body::Clear(_)));
         assert!(message.is_authentic());
         let mut forged = message.clone();
