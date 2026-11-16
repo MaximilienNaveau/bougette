@@ -18,7 +18,7 @@ so your build matches CI and the F-Droid build:
 
 ```sh
 nix develop        # shell with the pinned toolchain
-nix flake check -L # formatting, lint, tests: what CI runs
+nix flake check -L # formatting, lint, tests, licences: what CI runs
 ```
 
 ## Sending a change
@@ -38,6 +38,11 @@ The app ships on F-Droid and in nixpkgs, and is licensed under
   Zlib, Unicode…). No GPL, LGPL or AGPL in the app; ask first for MPL;
 - build from source: no prebuilt binaries downloaded at build time;
 - not pull in Google Play Services, Firebase, analytics or tracking.
+
+`nix flake check` checks the licences and sources of every crate against
+[deny.toml](deny.toml); CI also checks them for known vulnerabilities
+(`cargo deny check advisories`). A licence missing from `deny.toml` fails
+the check: add it only if it fits the rules above.
 
 ## Developer Certificate of Origin (DCO)
 

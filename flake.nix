@@ -45,6 +45,7 @@
             ./Cargo.toml
             ./Cargo.lock
             ./crates
+            ./deny.toml
           ];
         };
 
@@ -119,6 +120,7 @@
             pkgs.rustfmt
             pkgs.rust-analyzer
             pkgs.nixfmt
+            pkgs.cargo-deny
           ];
         };
 
@@ -135,6 +137,11 @@
           '';
           clippy = cargoCheck "clippy" [ pkgs.clippy ] ''
             cargo clippy --offline --all-targets -- -D warnings
+          '';
+          # The dependencies' licences and sources (deny.toml). Offline:
+          # the security advisories need the network, CI checks them.
+          licenses = cargoCheck "licenses" [ pkgs.cargo-deny ] ''
+            cargo deny --offline check licenses bans sources
           '';
           tests = cargoCheck "tests" [ ] ''
             cargo test --offline

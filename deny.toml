@@ -1,0 +1,45 @@
+# cargo-deny: what the dependencies may be (CLAUDE.md, §6). Run by
+# `nix flake check` (licences and sources, offline) and by CI (security
+# advisories, which need the network).
+
+[licenses]
+# Permissive licences only: no GPL, LGPL or AGPL in the app, and MPL only
+# after asking. A crate under several licences ("A OR B") passes if one is
+# allowed: r-efi is MIT OR Apache-2.0 OR LGPL-2.1-or-later.
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-1-Clause",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "CC0-1.0",
+    # Mozilla's root certificates, as data (webpki-roots, via iroh).
+    "CDLA-Permissive-2.0",
+    "ISC",
+    "MIT",
+    "MIT-0",
+    # The Unicode data of the ICU crates (URL parsing, via iroh).
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib",
+]
+confidence-threshold = 0.9
+
+[bans]
+# Two versions of a crate cost build time, not freedom: allowed.
+multiple-versions = "allow"
+# Our own crates depend on each other by path, without a version.
+wildcards = "allow"
+
+[sources]
+# Everything comes from crates.io: no git dependency, no other registry.
+unknown-registry = "deny"
+unknown-git = "deny"
+
+[advisories]
+# Vulnerabilities always fail. "Unmaintained" fails only for the crates we
+# depend on directly: we can't replace those of our dependencies (e.g.
+# `paste`, a compile-time macro iroh uses through netwatch), only follow
+# their updates.
+unmaintained = "workspace"
