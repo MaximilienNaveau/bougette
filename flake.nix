@@ -109,9 +109,45 @@
           binary "bougette-server" "bougette-server"
             "Server of Bougette: keeps and passes on the devices' changes";
 
-        # `nix develop`: the Rust toolchain from nixpkgs, pinned by
-        # flake.lock. Flutter and the Android targets come with the first
-        # UI code.
+        # The Rust library the app loads (`libbougette_api.so`).
+        packages.api = binary "bougette-api" "bougette-api" "Rust core of Bougette's app";
+
+        # `nix run .#app`: the Flutter app for Linux. Nix builds the Rust
+        # library above and the app separately, and puts the library in the
+        # app's `lib/`, where it looks for it (app/lib/main.dart): no Rust
+        # build inside the Flutter build.
+        packages.app = pkgs.flutter.buildFlutterApplication {
+          pname = "bougette";
+          version = "0.1.0";
+          src = pkgs.lib.fileset.toSource {
+            root = ./app;
+            fileset = pkgs.lib.fileset.unions [
+              ./app/pubspec.yaml
+              ./app/pubspec.lock
+              ./app/analysis_options.yaml
+              ./app/lib
+              ./app/linux
+            ];
+          };
+          # The Dart packages, pinned by pubspec.lock (read at evaluation:
+          # nixpkgs itself would want it converted to JSON first).
+          autoPubspecLock = ./app/pubspec.lock;
+          postInstall = ''
+            cp ${self.packages.${system}.api}/lib/libbougette_api.so \
+              "$out/app/bougette/lib/"
+          '';
+          meta = {
+            description = "Local-first app for individual and shared budgets";
+            license = with pkgs.lib.licenses; [
+              mit
+              asl20
+            ];
+            mainProgram = "bougette";
+          };
+        };
+
+        # `nix develop`: the Rust toolchain and Flutter from nixpkgs, pinned
+        # by flake.lock. The Android targets come later.
         devShells.default = pkgs.mkShell {
           packages = [
             pkgs.cargo
@@ -121,6 +157,10 @@
             pkgs.rust-analyzer
             pkgs.nixfmt
             pkgs.cargo-deny
+            pkgs.flutter
+            # The same version as the `flutter_rust_bridge` crate and Dart
+            # package.
+            pkgs.flutter_rust_bridge_codegen
           ];
         };
 
@@ -143,6 +183,9 @@
           licenses = cargoCheck "licenses" [ pkgs.cargo-deny ] ''
             cargo deny --offline check licenses bans sources
           '';
+          # The Flutter app builds (its analysis and tests run in CI, which
+          # has the network to fetch the Dart packages).
+          app = self.packages.${system}.app;
           tests = cargoCheck "tests" [ ] ''
             cargo test --offline
           '';

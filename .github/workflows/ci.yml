@@ -38,3 +38,10 @@ jobs:
       # flake's checks: it downloads the RustSec advisory database.
       - name: Check the dependencies for security advisories
         run: nix develop -c cargo deny check advisories
+
+      # The app's analysis and widget tests, on the Rust library Nix built.
+      - name: Analyze and test the Flutter app
+        run: |
+          nix build .#api
+          nix develop -c sh -c 'cd app && flutter analyze && \
+            BOUGETTE_LIB=$PWD/../result/lib/libbougette_api.so flutter test'
