@@ -14,7 +14,6 @@ use bougette_core::money::{Currency, Money};
 use bougette_core::month::Month;
 use bougette_core::pot::{Goal, Pot};
 use bougette_core::schedule::Schedule;
-use bougette_core::shared::reflections;
 use bougette_core::transaction::PotMove;
 use bougette_core::transaction::Transaction;
 use bougette_store::{Store, StoreError};
@@ -106,14 +105,24 @@ pub struct LineRow {
     pub ends_on: Option<String>,
     /// For an allocation, the pot it feeds (its identifier).
     pub pot: Option<String>,
+    /// In a personal budget, a line of another budget this member pays
+    /// (a planned contribution). Changing it changes it there.
+    pub reflected: bool,
+}
+
+/// Another budget, to choose where a line's money goes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BudgetChoice {
+    pub id: String,
+    pub name: String,
 }
 
 /// A transaction in a month.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransactionRow {
     pub id: String,
-    /// In a personal budget, a reflection of a shared budget's
-    /// transaction: change it there, not here.
+    /// In a personal budget, a transaction of another budget that this
+    /// member paid or received. Removing it removes it there.
     pub reflected: bool,
     /// `2026-11-16`.
     pub date: String,
@@ -164,6 +173,10 @@ pub struct MonthView {
     pub status: Status,
     pub running: i64,
     pub pots: Vec<PotRow>,
+    /// Where a new cost line's money can go besides a pot: the other
+    /// budgets in the same currency, for a personal budget only (that's
+    /// where the line shows, see `add_line`).
+    pub destinations: Vec<BudgetChoice>,
 }
 
 /// When a new line is due, from its first due date on. A plain enum (no
@@ -226,7 +239,13 @@ impl App {
     }
 
     /// Adds a planned line: `amount` cents, due as `repeat` says from
-    /// `first` (`2026-11-05`) on.
+    /// `first` (`2026-11-05`) on. Its money goes into pot `pot`, or to
+    /// budget `to_budget`, if given.
+    ///
+    /// A cost going to another budget is this member's planned
+    /// contribution to it: the line is written there, as an income they
+    /// pay, and shows here as a cost line (see `MonthView::destinations`).
+    /// Entered once, it is the same line seen from both budgets.
     #[allow(clippy::too_many_arguments)] // the fields of a new line
     pub fn add_line(
         &self,
@@ -238,21 +257,39 @@ impl App {
         repeat: Repeat,
         first: String,
         pot: Option<String>,
+        to_budget: Option<String>,
     ) -> Result<String, String> {
         let first = date(&first)?;
         let schedule = schedule(repeat, first);
         let pot = pot.map(|id| parse_id(&id).map(PotId)).transpose()?;
-        self.edit(&budget, |budget| {
+        let mut payer = None;
+        // `let target = match ...`: the budget the line is written into.
+        let target = match to_budget {
+            None => budget,
+            Some(other) => {
+                if income || pot.is_some() {
+                    return Err("only a cost, without a pot, goes to another budget".into());
+                }
+                if self.load(&other)?.currency() != self.load(&budget)?.currency() {
+                    return Err("the other budget has another currency".into());
+                }
+                payer = Some(MemberId(self.lock().member().map_err(stored)?));
+                other
+            }
+        };
+        self.edit(&target, |budget| {
             let mut line = Line::new(
                 name,
                 category,
-                kind(income),
+                // Seen from the other budget, a contribution comes in.
+                kind(income || payer.is_some()),
                 first,
                 Money::new(amount, budget.currency()),
                 schedule,
             )
             .map_err(|error| BudgetError::from(error).to_string())?;
             line.pot = pot;
+            line.payer = payer;
             let id = budget.add_line(line).map_err(|error| error.to_string())?;
             Ok(id.to_string())
         })
@@ -287,16 +324,33 @@ impl App {
                 })
             })
             .transpose()?;
-        self.edit(&budget, |budget| {
+        // On a line seen here but held by another budget (a planned
+        // contribution), the transaction goes there, as that line's: an
+        // income this member paid, in its category.
+        let mut target = budget.clone();
+        let mut kind = kind(income);
+        let mut category = category;
+        let mut payer = None;
+        if let Some(id) = line
+            && let Some(other) = self.holder_of_line(&budget, id)?
+            && let Some(held) = other.line(id)
+        {
+            kind = held.kind;
+            category = held.category.clone();
+            payer = held.payer.clone();
+            target = other.id.to_string();
+        }
+        self.edit(&target, |budget| {
             let mut transaction = Transaction::new(
                 day,
-                kind(income),
+                kind,
                 Money::new(amount, budget.currency()),
                 category,
                 line,
             );
             transaction.note = note;
             transaction.pot = pot;
+            transaction.payer = payer;
             let id = budget
                 .add_transaction(transaction)
                 .map_err(|error| error.to_string())?;
@@ -316,6 +370,7 @@ impl App {
     ) -> Result<(), String> {
         let id = LineId(parse_id(&line)?);
         let from = date(&from)?;
+        let budget = self.line_home(budget, id)?;
         self.change(&budget, |budget| {
             let amount = Money::new(amount, budget.currency());
             budget.change_line(id, from, amount, schedule(repeat, from))
@@ -331,18 +386,30 @@ impl App {
     ) -> Result<(), String> {
         let id = LineId(parse_id(&line)?);
         let last_day = last_day.map(|day| date(&day)).transpose()?;
+        let budget = self.line_home(budget, id)?;
         self.change(&budget, |budget| budget.end_line(id, last_day))
     }
 
     /// Removes line `line`, refused while transactions realise it.
     pub fn remove_line(&self, budget: String, line: String) -> Result<(), String> {
         let id = LineId(parse_id(&line)?);
+        let budget = self.line_home(budget, id)?;
         self.change(&budget, |budget| budget.remove_line(id))
     }
 
-    /// Removes transaction `transaction`.
+    /// Removes transaction `transaction`: from the budget that holds it,
+    /// if it's seen here as a reflection.
     pub fn remove_transaction(&self, budget: String, transaction: String) -> Result<(), String> {
         let id = TransactionId(parse_id(&transaction)?);
+        let held_here = self
+            .load(&budget)?
+            .transactions()
+            .iter()
+            .any(|transaction| transaction.id == id);
+        let budget = match self.lock().budget_of_transaction(id).map_err(stored)? {
+            Some(holder) if !held_here => holder.id.to_string(),
+            _ => budget,
+        };
         self.change(&budget, |budget| budget.remove_transaction(id))
     }
 
@@ -387,12 +454,14 @@ impl App {
 
     fn budgets_on(&self, today: Date) -> Result<Vec<BudgetSummary>, String> {
         let month = Month::of(today);
-        let store = self.lock();
+        let mut store = self.lock();
         let mut summaries = Vec::new();
         for (id, _) in store.budgets().map_err(stored)? {
             let Some(budget) = store.load(id).map_err(stored)? else {
                 continue;
             };
+            // With what a personal budget shows of the others.
+            let budget = store.shown(budget).map_err(stored)?;
             summaries.push(BudgetSummary {
                 id: id.to_string(),
                 name: budget.name.clone(),
@@ -406,7 +475,7 @@ impl App {
     }
 
     fn calendar_on(&self, budget: &str, year: i16, today: Date) -> Result<Vec<MonthCell>, String> {
-        let budget = self.load(budget)?;
+        let budget = self.shown(budget)?;
         let current = Month::of(today);
         let mut month = Month::new(year, 1).ok_or_else(|| format!("not a year: {year}"))?;
         let mut cells = Vec::new();
@@ -434,25 +503,14 @@ impl App {
     }
 
     fn month_on(&self, budget: &str, month: &str, today: Date) -> Result<MonthView, String> {
-        let mut budget = self.load(budget)?;
+        let own = self.load(budget)?;
         let month = parse_month(month)?;
-        // The budget's own transactions, before reflections are added.
-        let own: HashSet<TransactionId> = budget.transactions().iter().map(|t| t.id).collect();
-        // A personal budget shows what its member paid or received in the
-        // shared ones (computed here, never saved).
-        if budget.personal {
-            let mut store = self.lock();
-            let me = MemberId(store.member().map_err(stored)?);
-            let mut reflected = Vec::new();
-            for (id, _) in store.budgets().map_err(stored)? {
-                if id != budget.id
-                    && let Some(shared) = store.load(id).map_err(stored)?
-                {
-                    reflected.extend(reflections(&shared, &me));
-                }
-            }
-            budget = budget.with_reflections(reflected);
-        }
+        // The budget's own lines and transactions, before reflections are
+        // added: the others are reflections.
+        let own_lines: HashSet<LineId> = own.lines().iter().map(|line| line.id).collect();
+        let own: HashSet<TransactionId> = own.transactions().iter().map(|t| t.id).collect();
+        let budget = self.shown(budget)?;
+        let destinations = self.destinations(&budget)?;
         let mut lines = Vec::new();
         for income in [true, false] {
             for line in budget
@@ -493,6 +551,7 @@ impl App {
                     repeat: revision.and_then(|revision| repeat_of(revision.schedule)),
                     ends_on: line.ends_on().map(|day| day.to_string()),
                     pot: line.pot.map(|pot| pot.to_string()),
+                    reflected: !own_lines.contains(&line.id),
                 });
             }
         }
@@ -550,7 +609,54 @@ impl App {
             }),
             running: budget.running_balance(month, today).minor_units(),
             pots,
+            destinations,
         })
+    }
+
+    /// The budgets a new cost line of `budget` can send its money to (see
+    /// `MonthView::destinations`).
+    fn destinations(&self, budget: &Budget) -> Result<Vec<BudgetChoice>, String> {
+        if !budget.personal {
+            return Ok(Vec::new());
+        }
+        let store = self.lock();
+        let mut choices = Vec::new();
+        for (id, name) in store.budgets().map_err(stored)? {
+            if id != budget.id
+                && let Some(other) = store.load(id).map_err(stored)?
+                && other.currency() == budget.currency()
+            {
+                choices.push(BudgetChoice {
+                    id: id.to_string(),
+                    name,
+                });
+            }
+        }
+        Ok(choices)
+    }
+
+    /// The other budget holding line `id`, if `budget` shows it without
+    /// holding it (a planned contribution seen in a personal budget).
+    fn holder_of_line(&self, budget: &str, id: LineId) -> Result<Option<Budget>, String> {
+        if self.load(budget)?.line(id).is_some() {
+            return Ok(None);
+        }
+        self.lock().budget_of_line(id).map_err(stored)
+    }
+
+    /// The budget to change line `id`, seen in `budget`: the one holding
+    /// it.
+    fn line_home(&self, budget: String, id: LineId) -> Result<String, String> {
+        Ok(match self.holder_of_line(&budget, id)? {
+            Some(holder) => holder.id.to_string(),
+            None => budget,
+        })
+    }
+
+    /// Budget `id` as this member sees it (see `Store::shown`).
+    fn shown(&self, id: &str) -> Result<Budget, String> {
+        let budget = self.load(id)?;
+        self.lock().shown(budget).map_err(stored)
     }
 
     pub(crate) fn load(&self, id: &str) -> Result<Budget, String> {
@@ -704,6 +810,7 @@ mod tests {
             pay,
             "2026-01-01".into(),
             None,
+            None,
         )
         .unwrap();
         let rent = app
@@ -716,6 +823,7 @@ mod tests {
                 pay,
                 "2026-01-05".into(),
                 None,
+                None,
             )
             .unwrap();
         app.add_line(
@@ -726,6 +834,7 @@ mod tests {
             48000,
             Repeat::Yearly,
             "2026-03-10".into(),
+            None,
             None,
         )
         .unwrap();
@@ -849,5 +958,115 @@ mod tests {
         let pots = app.month_on(&id, "2026-11", today).unwrap().pots;
         assert_eq!(pots[0].balance, 10000);
         assert_eq!(pots[0].goal_by.as_deref(), Some("2027-06-30"));
+    }
+
+    #[test]
+    fn a_line_going_to_another_budget_is_one_line_seen_from_both() {
+        let app = app();
+        let today = day(2026, 11, 16);
+        let home = app.create_budget("Home".into(), "EUR".into()).unwrap();
+        app.set_personal(home.clone(), true).unwrap();
+        let flat = app.create_budget("Flat".into(), "EUR".into()).unwrap();
+        // The flat budget is offered as a destination, from the personal
+        // budget only.
+        let view = app.month_on(&home, "2026-11", today).unwrap();
+        assert_eq!(view.destinations.len(), 1);
+        assert_eq!(view.destinations[0].name, "Flat");
+        assert!(
+            app.month_on(&flat, "2026-11", today)
+                .unwrap()
+                .destinations
+                .is_empty()
+        );
+
+        // 100 a month from home to the flat, entered from home.
+        let line = app
+            .add_line(
+                home.clone(),
+                "Flat".into(),
+                "Contributions".into(),
+                false,
+                10000,
+                Repeat::Monthly,
+                "2026-01-01".into(),
+                None,
+                Some(flat.clone()),
+            )
+            .unwrap();
+        // The flat sees an income, home a cost: the same line.
+        let line_in = |budget: &str| {
+            app.month_on(budget, "2026-11", today)
+                .unwrap()
+                .lines
+                .into_iter()
+                .find(|row| row.id == line)
+                .unwrap()
+        };
+        let (at_flat, at_home) = (line_in(&flat), line_in(&home));
+        assert!(at_flat.income && !at_flat.reflected);
+        assert!(!at_home.income && at_home.reflected);
+        assert_eq!((at_home.category.as_str(), at_home.due), ("Flat", 10000));
+
+        // November's transfer, entered from home on that line, lands in
+        // the flat and counts once, against the line, in both.
+        app.add_transaction(
+            home.clone(),
+            "2026-11-01".into(),
+            false,
+            10000,
+            "Flat".into(),
+            Some(line.clone()),
+            String::new(),
+            None,
+            false,
+        )
+        .unwrap();
+        assert_eq!(line_in(&flat).actual, 10000);
+        assert_eq!(line_in(&home).actual, 10000);
+        let home_view = app.month_on(&home, "2026-11", today).unwrap();
+        assert_eq!(home_view.actual.costs, 10000);
+        assert_eq!(home_view.transactions[0].line.as_deref(), Some("Flat"));
+        // The home screen counts it too.
+        let budgets = app.budgets_on(today).unwrap();
+        let summary = budgets.iter().find(|b| b.id == home).unwrap();
+        assert_eq!(summary.monthly_balance, -10000);
+
+        // Changed from home, it changes in the flat.
+        app.change_line(
+            home.clone(),
+            line.clone(),
+            12000,
+            Repeat::Monthly,
+            "2026-12-01".into(),
+        )
+        .unwrap();
+        let december = app.month_on(&flat, "2026-12", today).unwrap();
+        assert_eq!(december.lines[0].amount, 12000);
+        // The transfer is removed from home, then the line.
+        let transfer = home_view.transactions[0].id.clone();
+        app.remove_transaction(home.clone(), transfer).unwrap();
+        app.remove_line(home.clone(), line).unwrap();
+        assert!(
+            app.month_on(&flat, "2026-11", today)
+                .unwrap()
+                .lines
+                .is_empty()
+        );
+
+        // An income doesn't go to another budget.
+        let refused = app
+            .add_line(
+                home.clone(),
+                "Gift".into(),
+                "Gifts".into(),
+                true,
+                100,
+                Repeat::Once,
+                "2026-11-20".into(),
+                None,
+                Some(flat),
+            )
+            .unwrap_err();
+        assert!(refused.contains("only a cost"), "{refused}");
     }
 }

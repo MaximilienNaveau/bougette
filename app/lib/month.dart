@@ -9,20 +9,18 @@ import 'forms.dart';
 import 'look.dart';
 import 'src/rust/api.dart';
 
-/// Asks, then removes a transaction; a reflection can't be removed here.
+/// Asks, then removes a transaction. A reflection is removed from the
+/// budget it comes from (its category is that budget's name).
 Future<bool> removeTransaction(
   BuildContext context,
   App app,
   String budget,
   TransactionRow transaction,
 ) async {
-  if (transaction.reflected) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(context.words.changeItThere)));
-    return false;
-  }
-  if (!await confirm(context, context.words.removeTransactionQuestion) ||
-      !context.mounted) {
+  final question = transaction.reflected
+      ? context.words.removeThereToo(transaction.category)
+      : context.words.removeTransactionQuestion;
+  if (!await confirm(context, question) || !context.mounted) {
     return false;
   }
   return guard(
@@ -83,6 +81,15 @@ class MonthBody extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         Text('${line.name} (${line.category})'),
+                        // A line of another budget, paid from this one.
+                        if (line.reflected)
+                          Tooltip(
+                            message: context.words.fromOther,
+                            child: const Padding(
+                              padding: EdgeInsets.only(left: 6),
+                              child: Icon(Icons.link, size: 16),
+                            ),
+                          ),
                         if (line.endsOn != null)
                           Text(
                             '  ${context.words.until(dateText(line.endsOn!))}',
@@ -150,7 +157,7 @@ class MonthBody extends StatelessWidget {
                 ].join(' · '),
               ),
               subtitle: transaction.reflected
-                  ? Text(context.words.fromShared)
+                  ? Text(context.words.fromOther)
                   : null,
               trailing: Amount(
                 transaction.income ? transaction.amount : -transaction.amount,

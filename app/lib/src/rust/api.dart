@@ -8,8 +8,8 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `budgets_on`, `calendar_on`, `change`, `date`, `edit`, `kind`, `load`, `lock`, `month_on`, `month_text`, `parse_id`, `parse_month`, `repeat_of`, `schedule`, `source`, `status`, `stored`, `today`, `totals`, `with`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These functions are ignored because they are not marked as `pub`: `budgets_on`, `calendar_on`, `change`, `date`, `destinations`, `edit`, `holder_of_line`, `kind`, `line_home`, `load`, `lock`, `month_on`, `month_text`, `parse_id`, `parse_month`, `repeat_of`, `schedule`, `shown`, `source`, `status`, `stored`, `today`, `totals`, `with`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<App>>
 abstract class App implements RustOpaqueInterface {
@@ -18,7 +18,13 @@ abstract class App implements RustOpaqueInterface {
   Future<void> accept({required String invitation, String? username});
 
   /// Adds a planned line: `amount` cents, due as `repeat` says from
-  /// `first` (`2026-11-05`) on.
+  /// `first` (`2026-11-05`) on. Its money goes into pot `pot`, or to
+  /// budget `to_budget`, if given.
+  ///
+  /// A cost going to another budget is this member's planned
+  /// contribution to it: the line is written there, as an income they
+  /// pay, and shows here as a cost line (see `MonthView::destinations`).
+  /// Entered once, it is the same line seen from both budgets.
   Future<String> addLine({
     required String budget,
     required String name,
@@ -28,6 +34,7 @@ abstract class App implements RustOpaqueInterface {
     required Repeat repeat,
     required String first,
     String? pot,
+    String? toBudget,
   });
 
   /// Adds a pot, with a goal of `goal` cents by `by` if given; returns
@@ -139,7 +146,8 @@ abstract class App implements RustOpaqueInterface {
   /// had, and get nothing new.
   Future<void> removeMember({required String budget, required String member});
 
-  /// Removes transaction `transaction`.
+  /// Removes transaction `transaction`: from the budget that holds it,
+  /// if it's seen here as a reflection.
   Future<void> removeTransaction({
     required String budget,
     required String transaction,
@@ -171,6 +179,25 @@ abstract class App implements RustOpaqueInterface {
 
   /// Syncs with the server. (Not `sync`: a keyword in Dart.)
   Future<SyncSummary> syncNow();
+}
+
+/// Another budget, to choose where a line's money goes.
+class BudgetChoice {
+  final String id;
+  final String name;
+
+  const BudgetChoice({required this.id, required this.name});
+
+  @override
+  int get hashCode => id.hashCode ^ name.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BudgetChoice &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name;
 }
 
 /// A budget on the home screen.
@@ -244,6 +271,10 @@ class LineRow {
   /// For an allocation, the pot it feeds (its identifier).
   final String? pot;
 
+  /// In a personal budget, a line of another budget this member pays
+  /// (a planned contribution). Changing it changes it there.
+  final bool reflected;
+
   const LineRow({
     required this.id,
     required this.name,
@@ -257,6 +288,7 @@ class LineRow {
     this.repeat,
     this.endsOn,
     this.pot,
+    required this.reflected,
   });
 
   @override
@@ -272,7 +304,8 @@ class LineRow {
       amount.hashCode ^
       repeat.hashCode ^
       endsOn.hashCode ^
-      pot.hashCode;
+      pot.hashCode ^
+      reflected.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -290,7 +323,8 @@ class LineRow {
           amount == other.amount &&
           repeat == other.repeat &&
           endsOn == other.endsOn &&
-          pot == other.pot;
+          pot == other.pot &&
+          reflected == other.reflected;
 }
 
 /// One month of the calendar.
@@ -365,6 +399,11 @@ class MonthView {
   final PlatformInt64 running;
   final List<PotRow> pots;
 
+  /// Where a new cost line's money can go besides a pot: the other
+  /// budgets in the same currency, for a personal budget only (that's
+  /// where the line shows, see `add_line`).
+  final List<BudgetChoice> destinations;
+
   const MonthView({
     required this.budget,
     required this.currency,
@@ -379,6 +418,7 @@ class MonthView {
     required this.status,
     required this.running,
     required this.pots,
+    required this.destinations,
   });
 
   @override
@@ -395,7 +435,8 @@ class MonthView {
       forecast.hashCode ^
       status.hashCode ^
       running.hashCode ^
-      pots.hashCode;
+      pots.hashCode ^
+      destinations.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -414,7 +455,8 @@ class MonthView {
           forecast == other.forecast &&
           status == other.status &&
           running == other.running &&
-          pots == other.pots;
+          pots == other.pots &&
+          destinations == other.destinations;
 }
 
 /// A pot and what it holds at the end of the month.
@@ -522,8 +564,8 @@ class Totals {
 class TransactionRow {
   final String id;
 
-  /// In a personal budget, a reflection of a shared budget's
-  /// transaction: change it there, not here.
+  /// In a personal budget, a transaction of another budget that this
+  /// member paid or received. Removing it removes it there.
   final bool reflected;
 
   /// `2026-11-16`.

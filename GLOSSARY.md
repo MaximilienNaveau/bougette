@@ -107,7 +107,7 @@ One amount of money that actually came in or went out on a given date, entered b
 _Avoid_: Movement, entry, payment
 
 **Payer**:
-Who paid a transaction of a shared budget: the budget itself (its joint money) or one member, which makes it an advance. (fr: payeur)
+Who pays a line or a transaction of a budget: the budget itself (its joint money) or one member, which makes an income their contribution and a cost their advance. What a member pays shows as a cost in their personal budget. (fr: payeur)
 _Avoid_: Owner, author, spender
 
 **Monthly balance**:
@@ -143,7 +143,7 @@ A standalone tool that suggests each member's contribution to a shared cost, usi
 _Avoid_: Simulator, wizard
 
 **Contribution**:
-Money a member puts into a shared budget, usually every month. Each member sets their own amount, possibly following the fair-split calculator. (fr: versement)
+Money a member puts into another budget, shared or not (e.g. a flat they rent out), usually every month. Each member sets their own amount, possibly following the fair-split calculator. Planned, it is one line of the receiving budget, paid by the member, that their personal budget shows as a cost line: entered from either budget, changed from either. (fr: versement)
 _Avoid_: Deposit, top-up, transfer
 
 **Advance**:

@@ -8,6 +8,7 @@ use crate::money::{Currency, Money};
 use crate::month::Month;
 use crate::pot::Pot;
 use crate::schedule::Schedule;
+use crate::shared::Reflections;
 use crate::transaction::{PotMove, Transaction};
 
 /// A budget (GLOSSARY.md: Budget): its lines (the plan), its transactions
@@ -330,17 +331,24 @@ impl Budget {
             .ok_or(BudgetError::UnknownLine)
     }
 
-    /// This budget with `extra` transactions added without checks: the
-    /// reflections of shared budgets in a personal budget (see
+    /// This budget with `extra` lines and transactions added without
+    /// checks: the reflections of other budgets in a personal budget (see
     /// `shared::reflections`), for display. Never save the result: the
     /// reflections would then be counted twice.
-    pub fn with_reflections(&self, extra: Vec<Transaction>) -> Budget {
+    pub fn with_reflections(&self, extra: Reflections) -> Budget {
         let mut budget = self.clone();
         // `extend` appends every item of an iterator, like
         // `v.insert(v.end(), ...)`; amounts in another currency are left
         // out.
+        budget.lines.extend(
+            extra
+                .lines
+                .into_iter()
+                .filter(|line| line.revisions()[0].amount.currency() == self.currency),
+        );
         budget.transactions.extend(
             extra
+                .transactions
                 .into_iter()
                 .filter(|transaction| transaction.amount.currency() == self.currency),
         );

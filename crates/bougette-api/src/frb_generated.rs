@@ -133,6 +133,7 @@ fn wire__crate__api__App_add_line_impl(
             let api_repeat = <crate::api::Repeat>::sse_decode(&mut deserializer);
             let api_first = <String>::sse_decode(&mut deserializer);
             let api_pot = <Option<String>>::sse_decode(&mut deserializer);
+            let api_to_budget = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, String>((move || {
@@ -160,6 +161,7 @@ fn wire__crate__api__App_add_line_impl(
                         api_repeat,
                         api_first,
                         api_pot,
+                        api_to_budget,
                     )?;
                     std::result::Result::Ok(output_ok)
                 })())
@@ -1725,6 +1727,18 @@ impl SseDecode for bool {
     }
 }
 
+impl SseDecode for crate::api::BudgetChoice {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_id = <String>::sse_decode(deserializer);
+        let mut var_name = <String>::sse_decode(deserializer);
+        return crate::api::BudgetChoice {
+            id: var_id,
+            name: var_name,
+        };
+    }
+}
+
 impl SseDecode for crate::api::BudgetSummary {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1781,6 +1795,7 @@ impl SseDecode for crate::api::LineRow {
         let mut var_repeat = <Option<crate::api::Repeat>>::sse_decode(deserializer);
         let mut var_endsOn = <Option<String>>::sse_decode(deserializer);
         let mut var_pot = <Option<String>>::sse_decode(deserializer);
+        let mut var_reflected = <bool>::sse_decode(deserializer);
         return crate::api::LineRow {
             id: var_id,
             name: var_name,
@@ -1794,7 +1809,20 @@ impl SseDecode for crate::api::LineRow {
             repeat: var_repeat,
             ends_on: var_endsOn,
             pot: var_pot,
+            reflected: var_reflected,
         };
+    }
+}
+
+impl SseDecode for Vec<crate::api::BudgetChoice> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::BudgetChoice>::sse_decode(deserializer));
+        }
+        return ans_;
     }
 }
 
@@ -1947,6 +1975,7 @@ impl SseDecode for crate::api::MonthView {
         let mut var_status = <crate::api::Status>::sse_decode(deserializer);
         let mut var_running = <i64>::sse_decode(deserializer);
         let mut var_pots = <Vec<crate::api::PotRow>>::sse_decode(deserializer);
+        let mut var_destinations = <Vec<crate::api::BudgetChoice>>::sse_decode(deserializer);
         return crate::api::MonthView {
             budget: var_budget,
             currency: var_currency,
@@ -1961,6 +1990,7 @@ impl SseDecode for crate::api::MonthView {
             status: var_status,
             running: var_running,
             pots: var_pots,
+            destinations: var_destinations,
         };
     }
 }
@@ -2242,6 +2272,22 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<App>> for App {
 }
 
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::BudgetChoice {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.id.into_into_dart().into_dart(),
+            self.name.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::BudgetChoice {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::BudgetChoice> for crate::api::BudgetChoice {
+    fn into_into_dart(self) -> crate::api::BudgetChoice {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::BudgetSummary {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -2277,6 +2323,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::LineRow {
             self.repeat.into_into_dart().into_dart(),
             self.ends_on.into_into_dart().into_dart(),
             self.pot.into_into_dart().into_dart(),
+            self.reflected.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -2369,6 +2416,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::MonthView {
             self.status.into_into_dart().into_dart(),
             self.running.into_into_dart().into_dart(),
             self.pots.into_into_dart().into_dart(),
+            self.destinations.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -2567,6 +2615,14 @@ impl SseEncode for bool {
     }
 }
 
+impl SseEncode for crate::api::BudgetChoice {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.id, serializer);
+        <String>::sse_encode(self.name, serializer);
+    }
+}
+
 impl SseEncode for crate::api::BudgetSummary {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2615,6 +2671,17 @@ impl SseEncode for crate::api::LineRow {
         <Option<crate::api::Repeat>>::sse_encode(self.repeat, serializer);
         <Option<String>>::sse_encode(self.ends_on, serializer);
         <Option<String>>::sse_encode(self.pot, serializer);
+        <bool>::sse_encode(self.reflected, serializer);
+    }
+}
+
+impl SseEncode for Vec<crate::api::BudgetChoice> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::BudgetChoice>::sse_encode(item, serializer);
+        }
     }
 }
 
@@ -2743,6 +2810,7 @@ impl SseEncode for crate::api::MonthView {
         <crate::api::Status>::sse_encode(self.status, serializer);
         <i64>::sse_encode(self.running, serializer);
         <Vec<crate::api::PotRow>>::sse_encode(self.pots, serializer);
+        <Vec<crate::api::BudgetChoice>>::sse_encode(self.destinations, serializer);
     }
 }
 

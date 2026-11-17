@@ -12,7 +12,6 @@ use bougette_core::money::{Currency, Money};
 use bougette_core::month::Month;
 use bougette_core::pot::{Goal, Pot};
 use bougette_core::schedule::Schedule;
-use bougette_core::shared::reflections;
 use bougette_core::split::{SplitRule, split};
 use bougette_core::transaction::{PotMove, Transaction};
 use bougette_store::{Role, Store, StoreError};
@@ -33,6 +32,8 @@ Budgets
 
 Lines (the plan)
   line add BUDGET NAME CATEGORY income|cost AMOUNT SCHEDULE FIRST [--pot POT]
+         [--payer MEMBER]  paid by a member: a planned contribution if an
+                           income, shown in their personal budget
   line change BUDGET LINE AMOUNT SCHEDULE FIRST    from FIRST on
   line end BUDGET LINE LAST_DAY|never
   line list BUDGET
@@ -189,6 +190,10 @@ pub fn run(words: &[&str], options: &Options, context: &mut Context) -> Result<S
             schedule,
             first,
         ] => {
+            let id = find_budget(context.store, budget)?.id;
+            let payer = option("payer")
+                .map(|member| find_member(context, id, member))
+                .transpose()?;
             // The closure is the change to make to the loaded budget.
             edit(context, budget, |budget| {
                 let first = parse_date(first)?;
@@ -204,6 +209,7 @@ pub fn run(words: &[&str], options: &Options, context: &mut Context) -> Result<S
                 if let Some(pot) = option("pot") {
                     line.pot = Some(find_pot(budget, pot)?.id);
                 }
+                line.payer = payer;
                 let id = budget.add_line(line).map_err(explain)?;
                 Ok(format!("Added line {name} ({}).\n", short(id)))
             })
@@ -350,6 +356,7 @@ fn budgets(context: &mut Context) -> Result<String, String> {
     let mut out = String::new();
     for (id, name) in stored(context.store.budgets())? {
         let budget = find_budget(context.store, &id.to_string())?;
+        let budget = stored(context.store.shown(budget))?;
         // `+=` on a String appends a `&str`; `&format!(...)` borrows the
         // temporary String as one.
         out += &format!(
@@ -369,21 +376,10 @@ fn budgets(context: &mut Context) -> Result<String, String> {
 /// One month of a budget: each line planned and actual, the unplanned
 /// transactions, the totals, the running balance and the pots.
 fn show(context: &mut Context, name: &str, month: Option<&str>) -> Result<String, String> {
-    let mut budget = find_budget(context.store, name)?;
-    // A personal budget shows what its member paid or received in the
-    // shared ones (computed here, never saved).
-    if budget.personal {
-        let me = MemberId(stored(context.store.member())?);
-        let mut reflected = Vec::new();
-        for (id, _) in stored(context.store.budgets())? {
-            if id != budget.id
-                && let Some(shared) = stored(context.store.load(id))?
-            {
-                reflected.extend(reflections(&shared, &me));
-            }
-        }
-        budget = budget.with_reflections(reflected);
-    }
+    // A personal budget shows what its member pays or receives in the
+    // other ones (computed, never saved).
+    let budget = find_budget(context.store, name)?;
+    let budget = stored(context.store.shown(budget))?;
     let month = match month {
         Some(month) => parse_month(month)?,
         None => Month::of(context.today),
@@ -509,8 +505,9 @@ fn show(context: &mut Context, name: &str, month: Option<&str>) -> Result<String
 /// The twelve months of a year: the planned monthly balance, the expected
 /// one (actual, forecast or plan, depending on the month) and the running
 /// balance.
-fn year(context: &Context, name: &str, year: Option<&str>) -> Result<String, String> {
+fn year(context: &mut Context, name: &str, year: Option<&str>) -> Result<String, String> {
     let budget = find_budget(context.store, name)?;
+    let budget = stored(context.store.shown(budget))?;
     let year: i16 = match year {
         Some(text) => text.parse().map_err(|_| format!("not a year: {text}"))?,
         None => context.today.year(),

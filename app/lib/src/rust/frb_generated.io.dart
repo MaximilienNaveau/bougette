@@ -62,6 +62,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ServerInfo dco_decode_box_autoadd_server_info(dynamic raw);
 
   @protected
+  BudgetChoice dco_decode_budget_choice(dynamic raw);
+
+  @protected
   BudgetSummary dco_decode_budget_summary(dynamic raw);
 
   @protected
@@ -75,6 +78,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   LineRow dco_decode_line_row(dynamic raw);
+
+  @protected
+  List<BudgetChoice> dco_decode_list_budget_choice(dynamic raw);
 
   @protected
   List<BudgetSummary> dco_decode_list_budget_summary(dynamic raw);
@@ -197,6 +203,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ServerInfo sse_decode_box_autoadd_server_info(SseDeserializer deserializer);
 
   @protected
+  BudgetChoice sse_decode_budget_choice(SseDeserializer deserializer);
+
+  @protected
   BudgetSummary sse_decode_budget_summary(SseDeserializer deserializer);
 
   @protected
@@ -210,6 +219,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   LineRow sse_decode_line_row(SseDeserializer deserializer);
+
+  @protected
+  List<BudgetChoice> sse_decode_list_budget_choice(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<BudgetSummary> sse_decode_list_budget_summary(
@@ -352,6 +366,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_budget_choice(BudgetChoice self, SseSerializer serializer);
+
+  @protected
   void sse_encode_budget_summary(BudgetSummary self, SseSerializer serializer);
 
   @protected
@@ -365,6 +382,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_line_row(LineRow self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_budget_choice(
+    List<BudgetChoice> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_budget_summary(

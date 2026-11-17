@@ -98,6 +98,51 @@ void main() {
     expect(find.text('Loyer (Logement)'), findsNothing);
   });
 
+  testWidgets('a line going to another budget shows in both', (tester) async {
+    tester.view.physicalSize = const Size(1600, 1200);
+    tester.view.devicePixelRatio = 1;
+    final app = (await tester.runAsync(() async {
+      final folder = Directory.systemTemp.createTempSync('bougette-test');
+      final app = await App.open(path: '${folder.path}/test.sqlite');
+      final home = await app.createBudget(name: 'Maison', currency: 'EUR');
+      await app.setPersonal(budget: home, personal: true);
+      await app.createBudget(name: 'Appartement', currency: 'EUR');
+      return app;
+    }))!;
+    await tester.pumpWidget(BougetteApp(app: app));
+    await settle(tester);
+
+    // From the personal budget, 100 a month to the flat's budget.
+    await tester.tap(find.text('Maison'));
+    await settle(tester);
+    await tester.tap(find.byTooltip('Add a line'));
+    await settle(tester);
+    await tester.enterText(find.widgetWithText(TextField, 'Name'), 'Appart');
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Category'),
+      'Apport',
+    );
+    await tester.enterText(find.widgetWithText(TextField, 'Amount'), '100');
+    await tester.tap(find.text('Feeds no pot'));
+    await settle(tester);
+    // The open menu draws its items again: tap the last one.
+    await tester.tap(find.text('Goes to the Appartement budget').last);
+    await settle(tester);
+    await tester.tap(find.text('OK'));
+    await settle(tester);
+    // Here, a cost in the category named after the other budget.
+    expect(find.text('Appart (Appartement)'), findsOneWidget);
+    expect(find.byTooltip('from another budget'), findsOneWidget);
+
+    // There, an income in the category typed.
+    await tester.pageBack();
+    await settle(tester);
+    await tester.tap(find.text('Appartement'));
+    await settle(tester);
+    expect(find.text('Appart (Apport)'), findsOneWidget);
+    expect(find.byTooltip('from another budget'), findsNothing);
+  });
+
   testWidgets('in French', (tester) async {
     tester.view.physicalSize = const Size(1600, 1200);
     tester.view.devicePixelRatio = 1;

@@ -36,7 +36,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use bougette_core::budget::Budget;
-use bougette_core::id::BudgetId;
+use bougette_core::id::{BudgetId, LineId, MemberId, TransactionId};
+use bougette_core::shared::{Reflections, reflections};
 use rusqlite::{Connection, OptionalExtension, params};
 use uuid::Uuid;
 
@@ -395,6 +396,56 @@ impl Store {
     /// not readable by this device.
     pub fn load(&self, id: BudgetId) -> Result<Option<Budget>, StoreError> {
         Ok(codec::decode(&self.records(&id.to_string())?)?)
+    }
+
+    /// `budget` as this member sees it: a personal budget also shows what
+    /// they pay or receive in the other budgets (see
+    /// `bougette_core::shared::reflections`). Computed, never saved.
+    pub fn shown(&mut self, budget: Budget) -> Result<Budget, StoreError> {
+        if !budget.personal {
+            return Ok(budget);
+        }
+        let me = MemberId(self.member()?);
+        let mut reflected = Reflections::default();
+        for (id, _) in self.budgets()? {
+            if id != budget.id
+                && let Some(other) = self.load(id)?
+            {
+                let mut more = reflections(&other, &me);
+                // `append` moves every item of `more` to the end, leaving
+                // it empty: no copies.
+                reflected.lines.append(&mut more.lines);
+                reflected.transactions.append(&mut more.transactions);
+            }
+        }
+        Ok(budget.with_reflections(reflected))
+    }
+
+    /// The budget that holds line `line`, among those this device can
+    /// read: where a line seen in a personal budget comes from.
+    pub fn budget_of_line(&self, line: LineId) -> Result<Option<Budget>, StoreError> {
+        self.find_budget(|budget| budget.line(line).is_some())
+    }
+
+    /// The budget that holds transaction `transaction` (see
+    /// `budget_of_line`).
+    pub fn budget_of_transaction(
+        &self,
+        transaction: TransactionId,
+    ) -> Result<Option<Budget>, StoreError> {
+        self.find_budget(|budget| budget.transactions().iter().any(|t| t.id == transaction))
+    }
+
+    /// The first budget for which `test` is true.
+    fn find_budget(&self, test: impl Fn(&Budget) -> bool) -> Result<Option<Budget>, StoreError> {
+        for (id, _) in self.budgets()? {
+            if let Some(budget) = self.load(id)?
+                && test(&budget)
+            {
+                return Ok(Some(budget));
+            }
+        }
+        Ok(None)
     }
 
     /// The budgets this device can read and that aren't deleted:
@@ -764,6 +815,7 @@ mod tests {
         rent.change_from(date(2026, 7, 1), eur(95000), monthly(date(2026, 7, 5)))
             .unwrap();
         rent.end_on(Some(date(2027, 6, 30))).unwrap();
+        rent.payer = Some(MemberId("cd".repeat(32)));
         let rent = budget.add_line(rent).unwrap();
 
         let mut savings = Line::new(

@@ -48,7 +48,6 @@
   "runningAtEnd": "Running balance at the end of the month",
   "transactions": "Transactions",
   "transactionButton": "Transaction",
-  "fromShared": "from a shared budget",
   "pots": "Pots",
   "addPot": "Add a pot",
   "goal": "goal {amount}",
@@ -161,7 +160,6 @@
     }
   },
   "removeTransactionQuestion": "Remove this transaction?",
-  "changeItThere": "It comes from a shared budget: change it there.",
   "repeatMonthly": "monthly",
   "repeatQuarterly": "quarterly",
   "repeatYearly": "yearly",
@@ -239,5 +237,22 @@
     }
   },
   "leave": "Leave the budget",
-  "leaveQuestion": "Leave this budget?"
+  "leaveQuestion": "Leave this budget?",
+  "fromOther": "from another budget",
+  "toBudget": "Goes to the {budget} budget",
+  "@toBudget": {
+    "placeholders": {
+      "budget": {
+        "type": "String"
+      }
+    }
+  },
+  "removeThereToo": "Remove this transaction? It is removed from {budget} too.",
+  "@removeThereToo": {
+    "placeholders": {
+      "budget": {
+        "type": "String"
+      }
+    }
+  }
 }

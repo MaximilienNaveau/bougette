@@ -97,9 +97,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get transactionButton => 'Transaction';
 
   @override
-  String get fromShared => 'from a shared budget';
-
-  @override
   String get pots => 'Pots';
 
   @override
@@ -235,9 +232,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get removeTransactionQuestion => 'Remove this transaction?';
-
-  @override
-  String get changeItThere => 'It comes from a shared budget: change it there.';
 
   @override
   String get repeatMonthly => 'monthly';
@@ -403,4 +397,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get leaveQuestion => 'Leave this budget?';
+
+  @override
+  String get fromOther => 'from another budget';
+
+  @override
+  String toBudget(String budget) {
+    return 'Goes to the $budget budget';
+  }
+
+  @override
+  String removeThereToo(String budget) {
+    return 'Remove this transaction? It is removed from $budget too.';
+  }
 }

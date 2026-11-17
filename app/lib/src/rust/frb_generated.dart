@@ -96,6 +96,7 @@ abstract class RustLibApi extends BaseApi {
     required Repeat repeat,
     required String first,
     String? pot,
+    String? toBudget,
   });
 
   Future<String> crateApiAppAddPot({
@@ -309,6 +310,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required Repeat repeat,
     required String first,
     String? pot,
+    String? toBudget,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -326,6 +328,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_repeat(repeat, serializer);
           sse_encode_String(first, serializer);
           sse_encode_opt_String(pot, serializer);
+          sse_encode_opt_String(toBudget, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -348,6 +351,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           repeat,
           first,
           pot,
+          toBudget,
         ],
         apiImpl: this,
       ),
@@ -366,6 +370,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       "repeat",
       "first",
       "pot",
+      "toBudget",
     ],
   );
 
@@ -1553,6 +1558,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  BudgetChoice dco_decode_budget_choice(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return BudgetChoice(
+      id: dco_decode_String(arr[0]),
+      name: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
   BudgetSummary dco_decode_budget_summary(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -1590,8 +1607,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   LineRow dco_decode_line_row(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 12)
-      throw Exception('unexpected arr length: expect 12 but see ${arr.length}');
+    if (arr.length != 13)
+      throw Exception('unexpected arr length: expect 13 but see ${arr.length}');
     return LineRow(
       id: dco_decode_String(arr[0]),
       name: dco_decode_String(arr[1]),
@@ -1605,7 +1622,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       repeat: dco_decode_opt_box_autoadd_repeat(arr[9]),
       endsOn: dco_decode_opt_String(arr[10]),
       pot: dco_decode_opt_String(arr[11]),
+      reflected: dco_decode_bool(arr[12]),
     );
+  }
+
+  @protected
+  List<BudgetChoice> dco_decode_list_budget_choice(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_budget_choice).toList();
   }
 
   @protected
@@ -1690,8 +1714,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   MonthView dco_decode_month_view(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 13)
-      throw Exception('unexpected arr length: expect 13 but see ${arr.length}');
+    if (arr.length != 14)
+      throw Exception('unexpected arr length: expect 14 but see ${arr.length}');
     return MonthView(
       budget: dco_decode_String(arr[0]),
       currency: dco_decode_String(arr[1]),
@@ -1706,6 +1730,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       status: dco_decode_status(arr[10]),
       running: dco_decode_i_64(arr[11]),
       pots: dco_decode_list_pot_row(arr[12]),
+      destinations: dco_decode_list_budget_choice(arr[13]),
     );
   }
 
@@ -1925,6 +1950,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  BudgetChoice sse_decode_budget_choice(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_name = sse_decode_String(deserializer);
+    return BudgetChoice(id: var_id, name: var_name);
+  }
+
+  @protected
   BudgetSummary sse_decode_budget_summary(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_id = sse_decode_String(deserializer);
@@ -1976,6 +2009,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_repeat = sse_decode_opt_box_autoadd_repeat(deserializer);
     var var_endsOn = sse_decode_opt_String(deserializer);
     var var_pot = sse_decode_opt_String(deserializer);
+    var var_reflected = sse_decode_bool(deserializer);
     return LineRow(
       id: var_id,
       name: var_name,
@@ -1989,7 +2023,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       repeat: var_repeat,
       endsOn: var_endsOn,
       pot: var_pot,
+      reflected: var_reflected,
     );
+  }
+
+  @protected
+  List<BudgetChoice> sse_decode_list_budget_choice(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <BudgetChoice>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_budget_choice(deserializer));
+    }
+    return ans_;
   }
 
   @protected
@@ -2127,6 +2176,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_status = sse_decode_status(deserializer);
     var var_running = sse_decode_i_64(deserializer);
     var var_pots = sse_decode_list_pot_row(deserializer);
+    var var_destinations = sse_decode_list_budget_choice(deserializer);
     return MonthView(
       budget: var_budget,
       currency: var_currency,
@@ -2141,6 +2191,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       status: var_status,
       running: var_running,
       pots: var_pots,
+      destinations: var_destinations,
     );
   }
 
@@ -2397,6 +2448,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_budget_choice(BudgetChoice self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.name, serializer);
+  }
+
+  @protected
   void sse_encode_budget_summary(BudgetSummary self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.id, serializer);
@@ -2440,6 +2498,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_box_autoadd_repeat(self.repeat, serializer);
     sse_encode_opt_String(self.endsOn, serializer);
     sse_encode_opt_String(self.pot, serializer);
+    sse_encode_bool(self.reflected, serializer);
+  }
+
+  @protected
+  void sse_encode_list_budget_choice(
+    List<BudgetChoice> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_budget_choice(item, serializer);
+    }
   }
 
   @protected
@@ -2560,6 +2631,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_status(self.status, serializer);
     sse_encode_i_64(self.running, serializer);
     sse_encode_list_pot_row(self.pots, serializer);
+    sse_encode_list_budget_choice(self.destinations, serializer);
   }
 
   @protected
@@ -2743,7 +2815,13 @@ class AppImpl extends RustOpaque implements App {
       );
 
   /// Adds a planned line: `amount` cents, due as `repeat` says from
-  /// `first` (`2026-11-05`) on.
+  /// `first` (`2026-11-05`) on. Its money goes into pot `pot`, or to
+  /// budget `to_budget`, if given.
+  ///
+  /// A cost going to another budget is this member's planned
+  /// contribution to it: the line is written there, as an income they
+  /// pay, and shows here as a cost line (see `MonthView::destinations`).
+  /// Entered once, it is the same line seen from both budgets.
   Future<String> addLine({
     required String budget,
     required String name,
@@ -2753,6 +2831,7 @@ class AppImpl extends RustOpaque implements App {
     required Repeat repeat,
     required String first,
     String? pot,
+    String? toBudget,
   }) => RustLib.instance.api.crateApiAppAddLine(
     that: this,
     budget: budget,
@@ -2763,6 +2842,7 @@ class AppImpl extends RustOpaque implements App {
     repeat: repeat,
     first: first,
     pot: pot,
+    toBudget: toBudget,
   );
 
   /// Adds a pot, with a goal of `goal` cents by `by` if given; returns
@@ -2951,7 +3031,8 @@ class AppImpl extends RustOpaque implements App {
         member: member,
       );
 
-  /// Removes transaction `transaction`.
+  /// Removes transaction `transaction`: from the budget that holds it,
+  /// if it's seen here as a reflection.
   Future<void> removeTransaction({
     required String budget,
     required String transaction,

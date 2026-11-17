@@ -27,7 +27,6 @@
   "runningAtEnd": "Solde cumulé à la fin du mois",
   "transactions": "Opérations",
   "transactionButton": "Opération",
-  "fromShared": "d'un budget commun",
   "pots": "Cagnottes",
   "addPot": "Ajouter une cagnotte",
   "goal": "objectif {amount}",
@@ -67,7 +66,6 @@
   "goesOn": "Continue",
   "removeQuestion": "Supprimer {name} ?",
   "removeTransactionQuestion": "Supprimer cette opération ?",
-  "changeItThere": "Elle vient d'un budget commun : modifiez-la là-bas.",
   "repeatMonthly": "mensuel",
   "repeatQuarterly": "trimestriel",
   "repeatYearly": "annuel",
@@ -118,5 +116,8 @@
   "removeMember": "Retirer du budget",
   "removeMemberQuestion": "Retirer {name} ? La personne garde ce qu'elle avait, et ne reçoit plus rien.",
   "leave": "Quitter le budget",
-  "leaveQuestion": "Quitter ce budget ?"
+  "leaveQuestion": "Quitter ce budget ?",
+  "fromOther": "d'un autre budget",
+  "toBudget": "Versé au budget {budget}",
+  "removeThereToo": "Supprimer cette opération ? Elle sera aussi supprimée de {budget}."
 }

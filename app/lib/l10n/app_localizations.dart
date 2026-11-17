@@ -260,12 +260,6 @@ abstract class AppLocalizations {
   /// **'Transaction'**
   String get transactionButton;
 
-  /// No description provided for @fromShared.
-  ///
-  /// In en, this message translates to:
-  /// **'from a shared budget'**
-  String get fromShared;
-
   /// No description provided for @pots.
   ///
   /// In en, this message translates to:
@@ -499,12 +493,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Remove this transaction?'**
   String get removeTransactionQuestion;
-
-  /// No description provided for @changeItThere.
-  ///
-  /// In en, this message translates to:
-  /// **'It comes from a shared budget: change it there.'**
-  String get changeItThere;
 
   /// No description provided for @repeatMonthly.
   ///
@@ -811,6 +799,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Leave this budget?'**
   String get leaveQuestion;
+
+  /// No description provided for @fromOther.
+  ///
+  /// In en, this message translates to:
+  /// **'from another budget'**
+  String get fromOther;
+
+  /// No description provided for @toBudget.
+  ///
+  /// In en, this message translates to:
+  /// **'Goes to the {budget} budget'**
+  String toBudget(String budget);
+
+  /// No description provided for @removeThereToo.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this transaction? It is removed from {budget} too.'**
+  String removeThereToo(String budget);
 }
 
 class _AppLocalizationsDelegate

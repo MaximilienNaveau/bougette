@@ -186,13 +186,15 @@ Widget repeatChoice(
   );
 }
 
-/// The form to add a planned line, possibly an allocation to one of
-/// `pots`. Returns whether one was added.
+/// The form to add a planned line of the month `view` shows. A cost's
+/// money can go to one of its pots (an allocation) or to one of its
+/// destinations, another budget (a contribution, written there). Returns
+/// whether one was added.
 Future<bool> addLine(
   BuildContext context,
   App app,
   String budget,
-  List<PotRow> pots,
+  MonthView view,
 ) {
   final name = TextEditingController();
   final category = TextEditingController();
@@ -200,7 +202,11 @@ Future<bool> addLine(
   var income = false;
   var repeat = Repeat.monthly;
   var first = DateTime.now();
-  PotRow? pot;
+  // Where the money goes: a pot, another budget, or neither. A record
+  // `(pot, budget)` with at most one set; records compare by value, as a
+  // dropdown needs.
+  (PotRow?, BudgetChoice?) goesTo = (null, null);
+  final goesSomewhere = view.pots.isNotEmpty || view.destinations.isNotEmpty;
   return form(
     context,
     context.words.newLine,
@@ -211,7 +217,7 @@ Future<bool> addLine(
       SwitchListTile(
         title: Text(context.words.income),
         value: income,
-        onChanged: pot == null
+        onChanged: goesTo == (null, null)
             ? (value) => setState(() => income = value)
             : null,
       ),
@@ -222,25 +228,30 @@ Future<bool> addLine(
         first,
         (date) => setState(() => first = date),
       ),
-      if (pots.isNotEmpty)
-        DropdownButton<PotRow?>(
-          value: pot,
+      if (goesSomewhere)
+        DropdownButton<(PotRow?, BudgetChoice?)>(
+          value: goesTo,
           isExpanded: true,
           items: [
             DropdownMenuItem(
-              value: null,
+              value: (null, null),
               child: Text(context.words.feedsNoPot),
             ),
-            for (final option in pots)
+            for (final pot in view.pots)
               DropdownMenuItem(
-                value: option,
-                child: Text(context.words.feedsPot(option.name)),
+                value: (pot, null),
+                child: Text(context.words.feedsPot(pot.name)),
+              ),
+            for (final other in view.destinations)
+              DropdownMenuItem(
+                value: (null, other),
+                child: Text(context.words.toBudget(other.name)),
               ),
           ],
-          // An allocation is a cost.
+          // Money going somewhere is a cost.
           onChanged: (value) => setState(() {
-            pot = value;
-            if (value != null) income = false;
+            goesTo = value ?? (null, null);
+            if (goesTo != (null, null)) income = false;
           }),
         ),
     ],
@@ -257,7 +268,9 @@ Future<bool> addLine(
           amount: value,
           repeat: repeat,
           first: day(first),
-          pot: pot?.id,
+          // `.$1` and `.$2`: the record's first and second fields.
+          pot: goesTo.$1?.id,
+          toBudget: goesTo.$2?.id,
         ),
       );
     },

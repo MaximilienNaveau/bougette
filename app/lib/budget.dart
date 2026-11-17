@@ -169,7 +169,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
                       heroTag: 'line',
                       tooltip: context.words.addLine,
                       onPressed: () =>
-                          _then(addLine(context, app, _budget, view.pots)),
+                          _then(addLine(context, app, _budget, view)),
                       child: const Icon(Icons.playlist_add),
                     ),
                     const SizedBox(height: 8),

@@ -78,6 +78,7 @@ pub fn encode(budget: &Budget) -> Records {
                 ("category", Some(line.category.clone())),
                 ("kind", Some(encode_kind(line.kind))),
                 ("pot", line.pot.map(|pot| pot.to_string())),
+                ("payer", line.payer.as_ref().map(|member| member.0.clone())),
                 ("ends_on", line.ends_on().map(|date| date.to_string())),
             ],
         );
@@ -210,6 +211,8 @@ pub fn decode(records: &Records) -> Result<Option<Budget>, Corrupt> {
         line.pot = optional(fields, "pot")
             .map(|pot| parse_uuid(pot).map(PotId))
             .transpose()?;
+        // Absent from lines written before lines had a payer: `None`.
+        line.payer = optional(fields, "payer").map(|member| MemberId(member.to_string()));
         budget
             .add_line(line)
             .map_err(|error| Corrupt(format!("line {id}: {error:?}")))?;

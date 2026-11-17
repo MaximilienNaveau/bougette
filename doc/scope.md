@@ -15,6 +15,7 @@ Décisions de périmètre prises pendant la séance de cadrage des 14 et 15 nove
   - saisie manuelle des opérations ; la catégorie est obligatoire, le poste facultatif, et plusieurs opérations peuvent se rattacher à un même poste ;
   - comparaison prévu/réel.
 - **Saisi une fois, visible dans deux budgets** : chaque versement, et chaque avance (opération d'un budget partagé payée par un membre), apparaît automatiquement comme sortie dans le budget individuel du membre.
+  - Un versement prévu est un seul poste : en l'ajoutant depuis son budget individuel, le membre indique où va l'argent (une cagnotte, ou un autre budget, partagé ou non, comme un appartement en location). Le poste est écrit dans le budget qui reçoit, comme un revenu payé par le membre, et se voit comme une dépense dans son budget individuel ; on le modifie depuis l'un ou l'autre, et l'opération qui le réalise compte une seule fois dans chacun.
 - **Soldes** : solde mensuel et solde cumulé, prévus et réels, calculés par l'app (pas de solde bancaire).
 - **Vue calendrier mensuelle** : réel pour les mois passés, projection pour le mois en cours, prévu pour les mois futurs, chacun avec sa couleur. Le mois est **toujours** le mois calendaire (du 1er à la fin du mois).
 - **Dépassements** : une cagnotte peut passer en négatif, rien n'est bloqué. Tout dépassement est visible, y compris par une couleur dans la vue calendrier.

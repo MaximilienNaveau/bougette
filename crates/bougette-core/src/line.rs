@@ -2,7 +2,7 @@
 
 use jiff::civil::Date;
 
-use crate::id::{LineId, PotId};
+use crate::id::{LineId, MemberId, PotId};
 use crate::money::Money;
 use crate::month::Month;
 use crate::schedule::{Period, Schedule};
@@ -52,6 +52,11 @@ pub struct Line {
     pub kind: Kind,
     /// For an allocation, the pot it feeds (GLOSSARY.md: Allocation).
     pub pot: Option<PotId>,
+    /// The member who pays it with their own money, as for a transaction
+    /// (GLOSSARY.md: Payer): an income paid by a member is their planned
+    /// contribution, shown as a cost line in their personal budget (see
+    /// `shared::reflections`). `None`: the budget's own money.
+    pub payer: Option<MemberId>,
     // Private: `change_from` keeps them sorted by date, and there is always
     // at least one.
     revisions: Vec<Revision>,
@@ -94,6 +99,7 @@ impl Line {
             category: category.into(),
             kind,
             pot: None,
+            payer: None,
             revisions: vec![Revision {
                 from,
                 amount,
