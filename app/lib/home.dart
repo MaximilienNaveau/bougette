@@ -3,7 +3,7 @@
 
 import 'package:flutter/material.dart';
 
-import 'calendar.dart';
+import 'budget.dart';
 import 'forms.dart';
 import 'look.dart';
 import 'settings.dart';
@@ -134,7 +134,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     await Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) =>
-                            CalendarScreen(app: widget.app, budget: budget),
+                            BudgetScreen(app: widget.app, budget: budget),
                       ),
                     );
                     _reload(); // something may have changed

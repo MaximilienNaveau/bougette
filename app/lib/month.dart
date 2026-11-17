@@ -1,5 +1,6 @@
-// One month of a budget: each line planned and actual, the transactions,
-// the totals, the running balance and the pots. Tapping a line or a
+// The detail of one month of a budget, shown under the calendar strip
+// (budget.dart): each line planned and actual, the transactions, the
+// totals, the running balance and the pots. Tapping a line or a
 // transaction offers what can be done to it.
 
 import 'package:flutter/material.dart';
@@ -8,96 +9,8 @@ import 'forms.dart';
 import 'look.dart';
 import 'src/rust/api.dart';
 
-class MonthScreen extends StatefulWidget {
-  const MonthScreen({
-    super.key,
-    required this.app,
-    required this.budget,
-    required this.month,
-  });
-
-  final App app;
-  final String budget;
-  final String month;
-
-  @override
-  State<MonthScreen> createState() => _MonthScreenState();
-}
-
-class _MonthScreenState extends State<MonthScreen> {
-  late Future<MonthView> _view;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  void _load() {
-    setState(() {
-      _view = widget.app.month(budget: widget.budget, month: widget.month);
-    });
-  }
-
-  /// Runs a form, and reloads the month if it changed something.
-  Future<void> _then(Future<bool> changed) async {
-    if (await changed) _load();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final app = widget.app;
-    final budget = widget.budget;
-    return FutureBuilder(
-      future: _view,
-      builder: (context, snapshot) {
-        final view = snapshot.data;
-        return Scaffold(
-          appBar: AppBar(
-            title: Text('${view?.budget ?? ''} ${monthTitle(widget.month)}'),
-          ),
-          floatingActionButton: view == null
-              ? null
-              : Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    FloatingActionButton.small(
-                      heroTag: 'line',
-                      tooltip: context.words.addLine,
-                      onPressed: () =>
-                          _then(addLine(context, app, budget, view.pots)),
-                      child: const Icon(Icons.playlist_add),
-                    ),
-                    const SizedBox(height: 8),
-                    FloatingActionButton.extended(
-                      heroTag: 'transaction',
-                      onPressed: () =>
-                          _then(addTransaction(context, app, budget, view)),
-                      icon: const Icon(Icons.add),
-                      label: Text(context.words.transactionButton),
-                    ),
-                  ],
-                ),
-          body: snapshot.hasError
-              ? Center(child: Text('${snapshot.error}'))
-              : view == null
-              ? const Center(child: CircularProgressIndicator())
-              : _MonthBody(
-                  view: view,
-                  onLine: (line) => _then(editLine(context, app, budget, line)),
-                  onTransaction: (transaction) => _then(
-                    _removeTransaction(context, app, budget, transaction),
-                  ),
-                  onAddPot: () => _then(addPot(context, app, budget)),
-                ),
-        );
-      },
-    );
-  }
-}
-
 /// Asks, then removes a transaction; a reflection can't be removed here.
-Future<bool> _removeTransaction(
+Future<bool> removeTransaction(
   BuildContext context,
   App app,
   String budget,
@@ -118,8 +31,9 @@ Future<bool> _removeTransaction(
   );
 }
 
-class _MonthBody extends StatelessWidget {
-  const _MonthBody({
+class MonthBody extends StatelessWidget {
+  const MonthBody({
+    super.key,
     required this.view,
     required this.onLine,
     required this.onTransaction,
