@@ -20,10 +20,15 @@ use bougette_core::transaction::Transaction;
 use bougette_store::{Store, StoreError};
 use jiff::civil::Date;
 
+// Public: the generated bridge names its types by their path.
+pub mod members;
+
 /// The app's access to this device's data.
 pub struct App {
     // A Mutex because Dart calls come from a pool of threads.
     store: Mutex<Store>,
+    // Drives the network operations (members.rs): iroh runs on tokio.
+    runtime: tokio::runtime::Runtime,
 }
 
 /// How a cost compares with its plan: the colour shown (doc/scope.md).
@@ -177,8 +182,20 @@ impl App {
     /// Opens (or creates) the database at `path`.
     pub fn open(path: String) -> Result<App, String> {
         let store = Store::open(std::path::Path::new(&path)).map_err(stored)?;
+        App::with(store)
+    }
+
+    fn with(store: Store) -> Result<App, String> {
+        // A runtime with one worker thread of its own: calls come from
+        // Dart's threads and wait for it (`block_on`).
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .enable_all()
+            .build()
+            .map_err(|error| format!("cannot start the async runtime: {error}"))?;
         Ok(App {
             store: Mutex::new(store),
+            runtime,
         })
     }
 
@@ -536,7 +553,7 @@ impl App {
         })
     }
 
-    fn load(&self, id: &str) -> Result<Budget, String> {
+    pub(crate) fn load(&self, id: &str) -> Result<Budget, String> {
         let id: BudgetId = BudgetId(id.parse().map_err(|_| format!("not a budget: {id}"))?);
         self.lock()
             .load(id)
@@ -570,7 +587,7 @@ impl App {
         .map(|_| ())
     }
 
-    fn lock(&self) -> MutexGuard<'_, Store> {
+    pub(crate) fn lock(&self) -> MutexGuard<'_, Store> {
         self.store.lock().unwrap_or_else(PoisonError::into_inner)
     }
 }
@@ -658,7 +675,7 @@ fn month_text(month: Month) -> String {
     format!("{}-{:02}", day.year(), day.month())
 }
 
-fn stored(error: StoreError) -> String {
+pub(crate) fn stored(error: StoreError) -> String {
     match error {
         StoreError::NotAllowed(reason) => reason,
         other => format!("storage: {other:?}"),
@@ -671,9 +688,7 @@ mod tests {
     use jiff::civil::date as day;
 
     fn app() -> App {
-        App {
-            store: Mutex::new(Store::open_in_memory().unwrap()),
-        }
+        App::with(Store::open_in_memory().unwrap()).unwrap()
     }
 
     /// A household budget with rent, an overspent month and a yearly line.

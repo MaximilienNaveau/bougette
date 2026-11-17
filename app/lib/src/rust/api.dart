@@ -3,15 +3,20 @@
 
 // ignore_for_file: invalid_use_of_internal_member, unused_import, unnecessary_import
 
+import 'api/members.dart';
 import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `budgets_on`, `calendar_on`, `change`, `date`, `edit`, `kind`, `load`, `lock`, `month_on`, `month_text`, `parse_id`, `parse_month`, `repeat_of`, `schedule`, `source`, `status`, `stored`, `today`, `totals`
+// These functions are ignored because they are not marked as `pub`: `budgets_on`, `calendar_on`, `change`, `date`, `edit`, `kind`, `load`, `lock`, `month_on`, `month_text`, `parse_id`, `parse_month`, `repeat_of`, `schedule`, `source`, `status`, `stored`, `today`, `totals`, `with`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<App>>
 abstract class App implements RustOpaqueInterface {
+  /// Asks to join a budget with an invitation, as `username` on a server
+  /// this device hasn't joined yet.
+  Future<void> accept({required String invitation, String? username});
+
   /// Adds a planned line: `amount` cents, due as `repeat` says from
   /// `first` (`2026-11-05`) on.
   Future<String> addLine({
@@ -67,6 +72,9 @@ abstract class App implements RustOpaqueInterface {
   /// Creates a budget; returns its identifier.
   Future<String> createBudget({required String name, required String currency});
 
+  /// The secret code that makes a new device one of this member's.
+  Future<String> deviceCode();
+
   /// Line `line` stops after `last_day`, or goes on again with `None`.
   Future<void> endLine({
     required String budget,
@@ -74,15 +82,62 @@ abstract class App implements RustOpaqueInterface {
     String? lastDay,
   });
 
+  /// Whether a recovery phrase locks a backup on the server.
+  Future<bool> hasRecovery();
+
+  /// An invitation to `budget` with `role`, valid `days` days: the text
+  /// to give the newcomer.
+  Future<String> invite({
+    required String budget,
+    required MemberRole role,
+    required int days,
+  });
+
+  /// Joins the server at `address` with the operator's invitation, then
+  /// syncs.
+  Future<SyncSummary> joinServer({
+    required String address,
+    required String token,
+    required String username,
+  });
+
+  /// This member leaves `budget`.
+  Future<void> leave({required String budget});
+
+  /// Makes this new device one of the member's, with a device code.
+  Future<void> linkDevice({required String code});
+
+  /// The members of `budget`, Admins first.
+  Future<List<MemberRow>> members({required String budget});
+
   /// Month `month` (`2026-11`) of budget `budget`.
   Future<MonthView> month({required String budget, required String month});
+
+  /// This member's role in `budget`.
+  Future<MemberRole?> myRole({required String budget});
+
+  /// How this member appears to the others, if set.
+  Future<String?> name();
 
   /// Opens (or creates) the database at `path`.
   static Future<App> open({required String path}) =>
       RustLib.instance.api.crateApiAppOpen(path: path);
 
+  /// Gets everything back on this new device with a new invitation from
+  /// the operator and the recovery phrase.
+  Future<SyncSummary> recover({
+    required String address,
+    required String token,
+    required String username,
+    required String phrase,
+  });
+
   /// Removes line `line`, refused while transactions realise it.
   Future<void> removeLine({required String budget, required String line});
+
+  /// Removes `member` from `budget` (an Admin only): they keep what they
+  /// had, and get nothing new.
+  Future<void> removeMember({required String budget, required String member});
 
   /// Removes transaction `transaction`.
   Future<void> removeTransaction({
@@ -93,9 +148,29 @@ abstract class App implements RustOpaqueInterface {
   /// Renames budget `budget`.
   Future<void> renameBudget({required String budget, required String name});
 
+  /// The server this device joined, if any.
+  Future<ServerInfo?> server();
+
+  /// Sets how this member appears to the others, in every budget.
+  Future<void> setName({required String name});
+
   /// Makes `budget` this member's personal budget, or not: their
   /// contributions and advances in shared budgets show in it.
   Future<void> setPersonal({required String budget, required bool personal});
+
+  /// Gives `member` the role `role` in `budget` (an Admin only).
+  Future<void> setRole({
+    required String budget,
+    required String member,
+    required MemberRole role,
+  });
+
+  /// Locks a backup on the server with `phrase`, or with one drawn now
+  /// and returned, to write down.
+  Future<String?> setUpRecovery({String? phrase});
+
+  /// Syncs with the server. (Not `sync`: a keyword in Dart.)
+  Future<SyncSummary> syncNow();
 }
 
 /// A budget on the home screen.

@@ -4,6 +4,7 @@
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
 import 'api.dart';
+import 'api/members.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -52,7 +53,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 dco_decode_box_autoadd_i_64(dynamic raw);
 
   @protected
+  MemberRole dco_decode_box_autoadd_member_role(dynamic raw);
+
+  @protected
   Repeat dco_decode_box_autoadd_repeat(dynamic raw);
+
+  @protected
+  ServerInfo dco_decode_box_autoadd_server_info(dynamic raw);
 
   @protected
   BudgetSummary dco_decode_budget_summary(dynamic raw);
@@ -76,6 +83,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<LineRow> dco_decode_list_line_row(dynamic raw);
 
   @protected
+  List<MemberRow> dco_decode_list_member_row(dynamic raw);
+
+  @protected
   List<MonthCell> dco_decode_list_month_cell(dynamic raw);
 
   @protected
@@ -86,6 +96,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<TransactionRow> dco_decode_list_transaction_row(dynamic raw);
+
+  @protected
+  MemberRole dco_decode_member_role(dynamic raw);
+
+  @protected
+  MemberRow dco_decode_member_row(dynamic raw);
 
   @protected
   MonthCell dco_decode_month_cell(dynamic raw);
@@ -100,7 +116,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64? dco_decode_opt_box_autoadd_i_64(dynamic raw);
 
   @protected
+  MemberRole? dco_decode_opt_box_autoadd_member_role(dynamic raw);
+
+  @protected
   Repeat? dco_decode_opt_box_autoadd_repeat(dynamic raw);
+
+  @protected
+  ServerInfo? dco_decode_opt_box_autoadd_server_info(dynamic raw);
 
   @protected
   PotRow dco_decode_pot_row(dynamic raw);
@@ -109,16 +131,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Repeat dco_decode_repeat(dynamic raw);
 
   @protected
+  ServerInfo dco_decode_server_info(dynamic raw);
+
+  @protected
   Source dco_decode_source(dynamic raw);
 
   @protected
   Status dco_decode_status(dynamic raw);
 
   @protected
+  SyncSummary dco_decode_sync_summary(dynamic raw);
+
+  @protected
   Totals dco_decode_totals(dynamic raw);
 
   @protected
   TransactionRow dco_decode_transaction_row(dynamic raw);
+
+  @protected
+  int dco_decode_u_32(dynamic raw);
 
   @protected
   int dco_decode_u_8(dynamic raw);
@@ -157,7 +188,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 sse_decode_box_autoadd_i_64(SseDeserializer deserializer);
 
   @protected
+  MemberRole sse_decode_box_autoadd_member_role(SseDeserializer deserializer);
+
+  @protected
   Repeat sse_decode_box_autoadd_repeat(SseDeserializer deserializer);
+
+  @protected
+  ServerInfo sse_decode_box_autoadd_server_info(SseDeserializer deserializer);
 
   @protected
   BudgetSummary sse_decode_budget_summary(SseDeserializer deserializer);
@@ -183,6 +220,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<LineRow> sse_decode_list_line_row(SseDeserializer deserializer);
 
   @protected
+  List<MemberRow> sse_decode_list_member_row(SseDeserializer deserializer);
+
+  @protected
   List<MonthCell> sse_decode_list_month_cell(SseDeserializer deserializer);
 
   @protected
@@ -197,6 +237,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  MemberRole sse_decode_member_role(SseDeserializer deserializer);
+
+  @protected
+  MemberRow sse_decode_member_row(SseDeserializer deserializer);
+
+  @protected
   MonthCell sse_decode_month_cell(SseDeserializer deserializer);
 
   @protected
@@ -209,7 +255,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer);
 
   @protected
+  MemberRole? sse_decode_opt_box_autoadd_member_role(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   Repeat? sse_decode_opt_box_autoadd_repeat(SseDeserializer deserializer);
+
+  @protected
+  ServerInfo? sse_decode_opt_box_autoadd_server_info(
+    SseDeserializer deserializer,
+  );
 
   @protected
   PotRow sse_decode_pot_row(SseDeserializer deserializer);
@@ -218,16 +274,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Repeat sse_decode_repeat(SseDeserializer deserializer);
 
   @protected
+  ServerInfo sse_decode_server_info(SseDeserializer deserializer);
+
+  @protected
   Source sse_decode_source(SseDeserializer deserializer);
 
   @protected
   Status sse_decode_status(SseDeserializer deserializer);
 
   @protected
+  SyncSummary sse_decode_sync_summary(SseDeserializer deserializer);
+
+  @protected
   Totals sse_decode_totals(SseDeserializer deserializer);
 
   @protected
   TransactionRow sse_decode_transaction_row(SseDeserializer deserializer);
+
+  @protected
+  int sse_decode_u_32(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_8(SseDeserializer deserializer);
@@ -272,7 +337,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_member_role(
+    MemberRole self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_repeat(Repeat self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_server_info(
+    ServerInfo self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_budget_summary(BudgetSummary self, SseSerializer serializer);
@@ -299,6 +376,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_list_line_row(List<LineRow> self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_member_row(
+    List<MemberRow> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_month_cell(
     List<MonthCell> self,
     SseSerializer serializer,
@@ -320,6 +403,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_member_role(MemberRole self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_member_row(MemberRow self, SseSerializer serializer);
+
+  @protected
   void sse_encode_month_cell(MonthCell self, SseSerializer serializer);
 
   @protected
@@ -335,8 +424,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_member_role(
+    MemberRole? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_repeat(
     Repeat? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_server_info(
+    ServerInfo? self,
     SseSerializer serializer,
   );
 
@@ -347,10 +448,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_repeat(Repeat self, SseSerializer serializer);
 
   @protected
+  void sse_encode_server_info(ServerInfo self, SseSerializer serializer);
+
+  @protected
   void sse_encode_source(Source self, SseSerializer serializer);
 
   @protected
   void sse_encode_status(Status self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_sync_summary(SyncSummary self, SseSerializer serializer);
 
   @protected
   void sse_encode_totals(Totals self, SseSerializer serializer);
@@ -360,6 +467,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     TransactionRow self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_u_32(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_8(int self, SseSerializer serializer);

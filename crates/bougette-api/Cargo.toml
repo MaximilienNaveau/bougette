@@ -18,6 +18,9 @@ crate-type = ["cdylib", "lib"]
 flutter_rust_bridge = "=2.13.0"
 bougette-core = { path = "../bougette-core" }
 bougette-store = { path = "../bougette-store" }
+# The server operations, shared with the CLI, and the runtime they need.
+bougette-sync = { path = "../bougette-sync" }
+tokio = { version = "1.54", features = ["rt-multi-thread", "net", "time"] }
 # To read the identifiers the app sends back.
 uuid = "1.29"
 # Dates, and today's date in the system's time zone (as in the CLI).

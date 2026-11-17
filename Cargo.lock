@@ -281,8 +281,10 @@ version = "0.1.0"
 dependencies = [
  "bougette-core",
  "bougette-store",
+ "bougette-sync",
  "flutter_rust_bridge",
  "jiff",
+ "tokio",
  "uuid",
 ]
 
