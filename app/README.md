@@ -5,7 +5,7 @@ It shows what the Rust core computes, through the API in
 [crates/bougette-api](../crates/bougette-api), and computes nothing itself.
 
 ```sh
-nix run .#app              # build and run it (from the repository's root)
+nix run .                  # build and run it (from the repository's root)
 ```
 
 It opens the same database as the command-line client

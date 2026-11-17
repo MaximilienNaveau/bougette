@@ -100,9 +100,18 @@
           };
       in
       {
-        # `nix build` / `nix run . -- help`: the `bougette` command-line
-        # client; `nix run .#server -- ...`: the server.
+        # `nix run .`: the app on Linux, the only system whose app Nix
+        # builds for now (nixpkgs has no Flutter build for macOS or
+        # Windows); the command-line client elsewhere.
         packages.default =
+          if pkgs.stdenv.hostPlatform.isLinux then
+            self.packages.${system}.app
+          else
+            self.packages.${system}.cli;
+
+        # `nix run .#cli -- help`: the command-line client;
+        # `nix run .#server -- ...`: the server.
+        packages.cli =
           binary "bougette" "bougette-cli"
             "Command-line client of Bougette, a local-first budget app";
         packages.server =
@@ -112,7 +121,7 @@
         # The Rust library the app loads (`libbougette_api.so`).
         packages.api = binary "bougette-api" "bougette-api" "Rust core of Bougette's app";
 
-        # `nix run .#app`: the Flutter app for Linux. Nix builds the Rust
+        # `nix run .#app` (or `nix run .` on Linux): the Flutter app. Nix builds the Rust
         # library above and the app separately, and puts the library in the
         # app's `lib/`, where it looks for it (app/lib/main.dart): no Rust
         # build inside the Flutter build.

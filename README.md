@@ -22,11 +22,11 @@ The domain and its storage work behind a command-line client (milestone
 M0 of [doc/scope.md](doc/scope.md)):
 
 ```sh
-nix run . -- help
-nix run . -- budget new Household
-nix run . -- line add Household Rent Housing cost 900 monthly 2026-01-05
-nix run . -- tx add Household 2026-11-05 cost 950 Housing --line Rent
-nix run . -- show Household
+nix run .#cli -- help
+nix run .#cli -- budget new Household
+nix run .#cli -- line add Household Rent Housing cost 900 monthly 2026-01-05
+nix run .#cli -- tx add Household 2026-11-05 cost 950 Housing --line Rent
+nix run .#cli -- show Household
 ```
 
 Members share budgets through a server that keeps their changes,
@@ -39,13 +39,13 @@ over [iroh](https://www.iroh.computer/):
 nix run .#server -- --db server.sqlite invite alice      # prints TOKEN
 nix run .#server -- --db server.sqlite serve --port 47210  # prints ADDRESS
 # Alice joins, creates a budget, invites Bob, sets up her recovery phrase.
-nix run . -- server join ADDRESS TOKEN alice
-nix run . -- budget new Household
-nix run . -- invite Household                            # prints INVITATION
-nix run . -- recovery setup
+nix run .#cli -- server join ADDRESS TOKEN alice
+nix run .#cli -- budget new Household
+nix run .#cli -- invite Household                            # prints INVITATION
+nix run .#cli -- recovery setup
 # Bob asks to join; Alice's device lets him in at its next sync.
-nix run . -- accept INVITATION --username bob
-nix run . -- sync
+nix run .#cli -- accept INVITATION --username bob
+nix run .#cli -- sync
 ```
 
 The Linux app (milestone M3, [app/](app/README.md)) shows the budgets, a
@@ -53,7 +53,7 @@ calendar coloured by overspending and the detail of each month, from the
 same database as the command-line client:
 
 ```sh
-nix run .#app
+nix run .            # the app, on Linux
 ```
 
 - [doc/scope.md](doc/scope.md): what v1 does and the milestones (French).
