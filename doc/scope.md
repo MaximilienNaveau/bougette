@@ -83,7 +83,8 @@ Chaque jalon est utilisable et testé seul.
    - l'app n'appelle que `bougette-api`, qui lui donne des vues prêtes à afficher (budgets et soldes, calendrier de l'année, détail d'un mois) ; elle ne calcule rien ;
    - Nix construit la bibliothèque Rust à part et la place à côté de l'app : pas de compilation Rust dans la compilation Flutter ;
    - l'app est en français et en anglais (la langue du système), montants et dates compris ; on y modifie, termine et supprime les postes, supprime les opérations, crée et alimente les cagnottes ;
-   - restent : les membres, la synchronisation et la récupération dans l'app (pour l'instant en ligne de commande), et la traduction des messages d'erreur venant de Rust (en anglais).
+   - les réglages de l'app couvrent le nom affiché, le serveur (rejoindre, synchroniser), la récupération (mettre en place, récupérer), les autres appareils (code, liaison) et l'acceptation d'une invitation ; chaque budget a ses membres (inviter, changer un rôle, retirer, quitter) ;
+   - reste : la traduction des messages d'erreur venant de Rust (en anglais).
 
 Viennent ensuite : Android, Windows, le NAS puis datcat.fr, et F-Droid/nixpkgs.
 
