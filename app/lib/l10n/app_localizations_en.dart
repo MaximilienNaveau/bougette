@@ -253,4 +253,154 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get repeatOnce => 'once';
+
+  @override
+  String get settings => 'Settings';
+
+  @override
+  String get yourName => 'Your name';
+
+  @override
+  String get noNameSet => 'How the other members see you';
+
+  @override
+  String get server => 'Server';
+
+  @override
+  String get noServer => 'Not on a server: your budgets stay on this device.';
+
+  @override
+  String onServer(String username, String server) {
+    return '$username on $server';
+  }
+
+  @override
+  String get joinServer => 'Join a server';
+
+  @override
+  String get address => 'Address';
+
+  @override
+  String get invitationToken => 'Invitation from the operator';
+
+  @override
+  String get username => 'Username';
+
+  @override
+  String get syncNow => 'Sync now';
+
+  @override
+  String synced(String sent, String received) {
+    return 'Sent $sent, received $received';
+  }
+
+  @override
+  String get recovery => 'Recovery';
+
+  @override
+  String get recoveryOn =>
+      'A backup on the server is locked by your recovery phrase.';
+
+  @override
+  String get recoveryOff =>
+      'No recovery phrase yet: if you lose all your devices, your budgets are lost.';
+
+  @override
+  String get setUpRecovery => 'Set up recovery';
+
+  @override
+  String get ownPhrase => 'Your own phrase (optional)';
+
+  @override
+  String get writePhrase =>
+      'Write this phrase down and keep it safe: nobody, the server\'s operator included, can give it back.';
+
+  @override
+  String get recover => 'Recover after losing your devices';
+
+  @override
+  String get phrase => 'Recovery phrase';
+
+  @override
+  String get devices => 'Devices';
+
+  @override
+  String get showCode => 'Link another device';
+
+  @override
+  String get codeWarning =>
+      'On the new device, choose “Make this device one of mine” and enter this code. Keep it secret: it opens all your budgets.';
+
+  @override
+  String get linkThis => 'Make this device one of mine';
+
+  @override
+  String get code => 'Code';
+
+  @override
+  String get copy => 'Copy';
+
+  @override
+  String get copied => 'Copied';
+
+  @override
+  String get close => 'Close';
+
+  @override
+  String get acceptInvitation => 'Join a budget with an invitation';
+
+  @override
+  String get invitation => 'Invitation';
+
+  @override
+  String get usernameIfNew => 'Username, if new on this server';
+
+  @override
+  String get askedToJoin =>
+      'Asked to join: an Admin\'s device lets you in at its next sync. Then sync again.';
+
+  @override
+  String get members => 'Members';
+
+  @override
+  String get noName => '(no name yet)';
+
+  @override
+  String get you => 'you';
+
+  @override
+  String get roleAdmin => 'Admin';
+
+  @override
+  String get roleEditor => 'Editor';
+
+  @override
+  String get roleReader => 'Reader';
+
+  @override
+  String get invite => 'Invite';
+
+  @override
+  String get validDays => 'Valid for (days)';
+
+  @override
+  String get giveInvitation =>
+      'Give this invitation, valid once. Then sync now and then: your device lets them in.';
+
+  @override
+  String get changeRole => 'Change the role';
+
+  @override
+  String get removeMember => 'Remove from the budget';
+
+  @override
+  String removeMemberQuestion(String name) {
+    return 'Remove $name? They keep what they had, and get nothing new.';
+  }
+
+  @override
+  String get leave => 'Leave the budget';
+
+  @override
+  String get leaveQuestion => 'Leave this budget?';
 }

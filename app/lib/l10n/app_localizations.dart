@@ -535,6 +535,282 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'once'**
   String get repeatOnce;
+
+  /// No description provided for @settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settings;
+
+  /// No description provided for @yourName.
+  ///
+  /// In en, this message translates to:
+  /// **'Your name'**
+  String get yourName;
+
+  /// No description provided for @noNameSet.
+  ///
+  /// In en, this message translates to:
+  /// **'How the other members see you'**
+  String get noNameSet;
+
+  /// No description provided for @server.
+  ///
+  /// In en, this message translates to:
+  /// **'Server'**
+  String get server;
+
+  /// No description provided for @noServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Not on a server: your budgets stay on this device.'**
+  String get noServer;
+
+  /// No description provided for @onServer.
+  ///
+  /// In en, this message translates to:
+  /// **'{username} on {server}'**
+  String onServer(String username, String server);
+
+  /// No description provided for @joinServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Join a server'**
+  String get joinServer;
+
+  /// No description provided for @address.
+  ///
+  /// In en, this message translates to:
+  /// **'Address'**
+  String get address;
+
+  /// No description provided for @invitationToken.
+  ///
+  /// In en, this message translates to:
+  /// **'Invitation from the operator'**
+  String get invitationToken;
+
+  /// No description provided for @username.
+  ///
+  /// In en, this message translates to:
+  /// **'Username'**
+  String get username;
+
+  /// No description provided for @syncNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync now'**
+  String get syncNow;
+
+  /// No description provided for @synced.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent {sent}, received {received}'**
+  String synced(String sent, String received);
+
+  /// No description provided for @recovery.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovery'**
+  String get recovery;
+
+  /// No description provided for @recoveryOn.
+  ///
+  /// In en, this message translates to:
+  /// **'A backup on the server is locked by your recovery phrase.'**
+  String get recoveryOn;
+
+  /// No description provided for @recoveryOff.
+  ///
+  /// In en, this message translates to:
+  /// **'No recovery phrase yet: if you lose all your devices, your budgets are lost.'**
+  String get recoveryOff;
+
+  /// No description provided for @setUpRecovery.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up recovery'**
+  String get setUpRecovery;
+
+  /// No description provided for @ownPhrase.
+  ///
+  /// In en, this message translates to:
+  /// **'Your own phrase (optional)'**
+  String get ownPhrase;
+
+  /// No description provided for @writePhrase.
+  ///
+  /// In en, this message translates to:
+  /// **'Write this phrase down and keep it safe: nobody, the server\'s operator included, can give it back.'**
+  String get writePhrase;
+
+  /// No description provided for @recover.
+  ///
+  /// In en, this message translates to:
+  /// **'Recover after losing your devices'**
+  String get recover;
+
+  /// No description provided for @phrase.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovery phrase'**
+  String get phrase;
+
+  /// No description provided for @devices.
+  ///
+  /// In en, this message translates to:
+  /// **'Devices'**
+  String get devices;
+
+  /// No description provided for @showCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Link another device'**
+  String get showCode;
+
+  /// No description provided for @codeWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'On the new device, choose “Make this device one of mine” and enter this code. Keep it secret: it opens all your budgets.'**
+  String get codeWarning;
+
+  /// No description provided for @linkThis.
+  ///
+  /// In en, this message translates to:
+  /// **'Make this device one of mine'**
+  String get linkThis;
+
+  /// No description provided for @code.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get code;
+
+  /// No description provided for @copy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get copy;
+
+  /// No description provided for @copied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get copied;
+
+  /// No description provided for @close.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get close;
+
+  /// No description provided for @acceptInvitation.
+  ///
+  /// In en, this message translates to:
+  /// **'Join a budget with an invitation'**
+  String get acceptInvitation;
+
+  /// No description provided for @invitation.
+  ///
+  /// In en, this message translates to:
+  /// **'Invitation'**
+  String get invitation;
+
+  /// No description provided for @usernameIfNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Username, if new on this server'**
+  String get usernameIfNew;
+
+  /// No description provided for @askedToJoin.
+  ///
+  /// In en, this message translates to:
+  /// **'Asked to join: an Admin\'s device lets you in at its next sync. Then sync again.'**
+  String get askedToJoin;
+
+  /// No description provided for @members.
+  ///
+  /// In en, this message translates to:
+  /// **'Members'**
+  String get members;
+
+  /// No description provided for @noName.
+  ///
+  /// In en, this message translates to:
+  /// **'(no name yet)'**
+  String get noName;
+
+  /// No description provided for @you.
+  ///
+  /// In en, this message translates to:
+  /// **'you'**
+  String get you;
+
+  /// No description provided for @roleAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin'**
+  String get roleAdmin;
+
+  /// No description provided for @roleEditor.
+  ///
+  /// In en, this message translates to:
+  /// **'Editor'**
+  String get roleEditor;
+
+  /// No description provided for @roleReader.
+  ///
+  /// In en, this message translates to:
+  /// **'Reader'**
+  String get roleReader;
+
+  /// No description provided for @invite.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite'**
+  String get invite;
+
+  /// No description provided for @validDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Valid for (days)'**
+  String get validDays;
+
+  /// No description provided for @giveInvitation.
+  ///
+  /// In en, this message translates to:
+  /// **'Give this invitation, valid once. Then sync now and then: your device lets them in.'**
+  String get giveInvitation;
+
+  /// No description provided for @changeRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Change the role'**
+  String get changeRole;
+
+  /// No description provided for @removeMember.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from the budget'**
+  String get removeMember;
+
+  /// No description provided for @removeMemberQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {name}? They keep what they had, and get nothing new.'**
+  String removeMemberQuestion(String name);
+
+  /// No description provided for @leave.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave the budget'**
+  String get leave;
+
+  /// No description provided for @leaveQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave this budget?'**
+  String get leaveQuestion;
 }
 
 class _AppLocalizationsDelegate

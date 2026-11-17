@@ -6,7 +6,9 @@ import 'package:flutter/material.dart';
 import 'calendar.dart';
 import 'forms.dart';
 import 'look.dart';
+import 'settings.dart';
 import 'src/rust/api.dart';
+import 'src/rust/api/members.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.app});
@@ -39,6 +41,23 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  /// Syncs with the server, and says what came and went.
+  Future<void> _sync() async {
+    SyncSummary? summary;
+    final ok = await guard(
+      context,
+      () async => summary = await widget.app.syncNow(),
+    );
+    if (ok && mounted) {
+      final text = context.words.synced(
+        '${summary!.sent}',
+        '${summary!.received}',
+      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+    }
+    _reload();
+  }
+
   Future<void> _create() async {
     final name = await askText(
       context,
@@ -57,7 +76,28 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(context.words.myBudgets)),
+      appBar: AppBar(
+        title: Text(context.words.myBudgets),
+        actions: [
+          IconButton(
+            onPressed: _sync,
+            icon: const Icon(Icons.sync),
+            tooltip: context.words.syncNow,
+          ),
+          IconButton(
+            onPressed: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => SettingsScreen(app: widget.app),
+                ),
+              );
+              _reload();
+            },
+            icon: const Icon(Icons.settings),
+            tooltip: context.words.settings,
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _create,
         icon: const Icon(Icons.add),

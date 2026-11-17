@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import 'forms.dart';
 import 'look.dart';
+import 'members.dart';
 import 'month.dart';
 import 'src/rust/api.dart';
 
@@ -54,6 +55,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
     if (ok) setState(() => _name = name);
   }
 
+  Future<void> _members() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            MembersScreen(app: widget.app, budget: widget.budget.id),
+      ),
+    );
+    _load();
+  }
+
   Future<void> _togglePersonal() async {
     final ok = await guard(
       context,
@@ -92,6 +103,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
           PopupMenuButton<VoidCallback>(
             onSelected: (action) => action(),
             itemBuilder: (context) => [
+              PopupMenuItem(
+                value: _members,
+                child: Text(context.words.members),
+              ),
               PopupMenuItem(value: _rename, child: Text(context.words.rename)),
               CheckedPopupMenuItem(
                 value: _togglePersonal,

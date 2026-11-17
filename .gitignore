@@ -1,9 +1,11 @@
 # Rust build output (the equivalent of a CMake build/ directory).
 target/
 
-# `nix build` results.
+# `nix build` results (CI names the library's and the server's).
 result
 result-*
+/api
+/server
 
 # direnv's cache, if you use `use flake` in an .envrc.
 .direnv/

@@ -166,5 +166,78 @@
   "repeatQuarterly": "quarterly",
   "repeatYearly": "yearly",
   "repeatWeekly": "weekly",
-  "repeatOnce": "once"
+  "repeatOnce": "once",
+  "settings": "Settings",
+  "yourName": "Your name",
+  "noNameSet": "How the other members see you",
+  "server": "Server",
+  "noServer": "Not on a server: your budgets stay on this device.",
+  "onServer": "{username} on {server}",
+  "@onServer": {
+    "placeholders": {
+      "username": {
+        "type": "String"
+      },
+      "server": {
+        "type": "String"
+      }
+    }
+  },
+  "joinServer": "Join a server",
+  "address": "Address",
+  "invitationToken": "Invitation from the operator",
+  "username": "Username",
+  "syncNow": "Sync now",
+  "synced": "Sent {sent}, received {received}",
+  "@synced": {
+    "placeholders": {
+      "sent": {
+        "type": "String"
+      },
+      "received": {
+        "type": "String"
+      }
+    }
+  },
+  "recovery": "Recovery",
+  "recoveryOn": "A backup on the server is locked by your recovery phrase.",
+  "recoveryOff": "No recovery phrase yet: if you lose all your devices, your budgets are lost.",
+  "setUpRecovery": "Set up recovery",
+  "ownPhrase": "Your own phrase (optional)",
+  "writePhrase": "Write this phrase down and keep it safe: nobody, the server's operator included, can give it back.",
+  "recover": "Recover after losing your devices",
+  "phrase": "Recovery phrase",
+  "devices": "Devices",
+  "showCode": "Link another device",
+  "codeWarning": "On the new device, choose “Make this device one of mine” and enter this code. Keep it secret: it opens all your budgets.",
+  "linkThis": "Make this device one of mine",
+  "code": "Code",
+  "copy": "Copy",
+  "copied": "Copied",
+  "close": "Close",
+  "acceptInvitation": "Join a budget with an invitation",
+  "invitation": "Invitation",
+  "usernameIfNew": "Username, if new on this server",
+  "askedToJoin": "Asked to join: an Admin's device lets you in at its next sync. Then sync again.",
+  "members": "Members",
+  "noName": "(no name yet)",
+  "you": "you",
+  "roleAdmin": "Admin",
+  "roleEditor": "Editor",
+  "roleReader": "Reader",
+  "invite": "Invite",
+  "validDays": "Valid for (days)",
+  "giveInvitation": "Give this invitation, valid once. Then sync now and then: your device lets them in.",
+  "changeRole": "Change the role",
+  "removeMember": "Remove from the budget",
+  "removeMemberQuestion": "Remove {name}? They keep what they had, and get nothing new.",
+  "@removeMemberQuestion": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "leave": "Leave the budget",
+  "leaveQuestion": "Leave this budget?"
 }

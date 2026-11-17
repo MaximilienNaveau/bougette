@@ -10,7 +10,8 @@ import 'src/rust/api.dart';
 /// Returns whether it succeeded.
 Future<bool> guard(
   BuildContext context,
-  Future<Object?> Function() action,
+  // `Future<void>`: any Future fits, whatever its value.
+  Future<void> Function() action,
 ) async {
   try {
     await action();

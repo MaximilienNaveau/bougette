@@ -18,7 +18,9 @@ cargo build --release -p bougette-api          # the Rust library
 cd app
 flutter_rust_bridge_codegen generate           # after changing the API
 flutter analyze
-BOUGETTE_LIB=../target/release/libbougette_api.so flutter test
+cargo build -p bougette-server                 # for the members' test
+BOUGETTE_LIB=../target/release/libbougette_api.so \
+  BOUGETTE_SERVER=../target/debug/bougette-server flutter test
 ```
 
 `lib/src/rust/` and `crates/bougette-api/src/frb_generated.rs` are written

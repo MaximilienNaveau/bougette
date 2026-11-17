@@ -255,4 +255,155 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get repeatOnce => 'une fois';
+
+  @override
+  String get settings => 'Réglages';
+
+  @override
+  String get yourName => 'Votre nom';
+
+  @override
+  String get noNameSet => 'Comment les autres membres vous voient';
+
+  @override
+  String get server => 'Serveur';
+
+  @override
+  String get noServer =>
+      'Sur aucun serveur : vos budgets restent sur cet appareil.';
+
+  @override
+  String onServer(String username, String server) {
+    return '$username sur $server';
+  }
+
+  @override
+  String get joinServer => 'Rejoindre un serveur';
+
+  @override
+  String get address => 'Adresse';
+
+  @override
+  String get invitationToken => 'Invitation de l\'opérateur';
+
+  @override
+  String get username => 'Nom d\'utilisateur';
+
+  @override
+  String get syncNow => 'Synchroniser';
+
+  @override
+  String synced(String sent, String received) {
+    return 'Envoyé $sent, reçu $received';
+  }
+
+  @override
+  String get recovery => 'Récupération';
+
+  @override
+  String get recoveryOn =>
+      'Une sauvegarde sur le serveur est verrouillée par votre phrase de récupération.';
+
+  @override
+  String get recoveryOff =>
+      'Pas encore de phrase de récupération : si vous perdez tous vos appareils, vos budgets sont perdus.';
+
+  @override
+  String get setUpRecovery => 'Mettre en place la récupération';
+
+  @override
+  String get ownPhrase => 'Votre propre phrase (facultatif)';
+
+  @override
+  String get writePhrase =>
+      'Notez cette phrase et gardez-la en lieu sûr : personne, pas même l\'opérateur du serveur, ne peut vous la redonner.';
+
+  @override
+  String get recover => 'Récupérer après la perte de vos appareils';
+
+  @override
+  String get phrase => 'Phrase de récupération';
+
+  @override
+  String get devices => 'Appareils';
+
+  @override
+  String get showCode => 'Lier un autre appareil';
+
+  @override
+  String get codeWarning =>
+      'Sur le nouvel appareil, choisissez « Faire de cet appareil l\'un des miens » et saisissez ce code. Gardez-le secret : il ouvre tous vos budgets.';
+
+  @override
+  String get linkThis => 'Faire de cet appareil l\'un des miens';
+
+  @override
+  String get code => 'Code';
+
+  @override
+  String get copy => 'Copier';
+
+  @override
+  String get copied => 'Copié';
+
+  @override
+  String get close => 'Fermer';
+
+  @override
+  String get acceptInvitation => 'Rejoindre un budget avec une invitation';
+
+  @override
+  String get invitation => 'Invitation';
+
+  @override
+  String get usernameIfNew => 'Nom d\'utilisateur, si nouveau sur ce serveur';
+
+  @override
+  String get askedToJoin =>
+      'Demande envoyée : l\'appareil d\'un Admin vous fera entrer à sa prochaine synchronisation. Synchronisez ensuite.';
+
+  @override
+  String get members => 'Membres';
+
+  @override
+  String get noName => '(pas encore de nom)';
+
+  @override
+  String get you => 'vous';
+
+  @override
+  String get roleAdmin => 'Admin';
+
+  @override
+  String get roleEditor => 'Éditeur';
+
+  @override
+  String get roleReader => 'Lecteur';
+
+  @override
+  String get invite => 'Inviter';
+
+  @override
+  String get validDays => 'Valable (jours)';
+
+  @override
+  String get giveInvitation =>
+      'Donnez cette invitation, valable une fois. Synchronisez ensuite de temps en temps : votre appareil fera entrer la personne.';
+
+  @override
+  String get changeRole => 'Changer le rôle';
+
+  @override
+  String get removeMember => 'Retirer du budget';
+
+  @override
+  String removeMemberQuestion(String name) {
+    return 'Retirer $name ? La personne garde ce qu\'elle avait, et ne reçoit plus rien.';
+  }
+
+  @override
+  String get leave => 'Quitter le budget';
+
+  @override
+  String get leaveQuestion => 'Quitter ce budget ?';
 }
