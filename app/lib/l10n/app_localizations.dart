@@ -434,41 +434,17 @@ abstract class AppLocalizations {
   /// **'By a date'**
   String get byADate;
 
-  /// No description provided for @changeFromDate.
-  ///
-  /// In en, this message translates to:
-  /// **'Change the amount from a date…'**
-  String get changeFromDate;
-
   /// No description provided for @endIt.
   ///
   /// In en, this message translates to:
   /// **'End it…'**
   String get endIt;
 
-  /// No description provided for @endsChange.
-  ///
-  /// In en, this message translates to:
-  /// **'Ends {date}: change…'**
-  String endsChange(String date);
-
   /// No description provided for @removeIt.
   ///
   /// In en, this message translates to:
   /// **'Remove it'**
   String get removeIt;
-
-  /// No description provided for @changeLine.
-  ///
-  /// In en, this message translates to:
-  /// **'Change {name}'**
-  String changeLine(String name);
-
-  /// No description provided for @monthsBeforeKeep.
-  ///
-  /// In en, this message translates to:
-  /// **'The months before keep the old amount.'**
-  String get monthsBeforeKeep;
 
   /// No description provided for @endLine.
   ///
@@ -817,6 +793,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Remove this transaction? It is removed from {budget} too.'**
   String removeThereToo(String budget);
+
+  /// No description provided for @amounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Amounts over time'**
+  String get amounts;
+
+  /// No description provided for @start.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get start;
+
+  /// No description provided for @changeNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Change {number}'**
+  String changeNumber(int number);
+
+  /// No description provided for @repeats.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeats'**
+  String get repeats;
+
+  /// No description provided for @addChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a change'**
+  String get addChange;
+
+  /// No description provided for @changeAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Change this amount'**
+  String get changeAmount;
+
+  /// No description provided for @asBefore.
+  ///
+  /// In en, this message translates to:
+  /// **'As before'**
+  String get asBefore;
+
+  /// No description provided for @removeAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this change'**
+  String get removeAmount;
+
+  /// No description provided for @removeAmountQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this change? The amount before goes on.'**
+  String get removeAmountQuestion;
+
+  /// No description provided for @heldIn.
+  ///
+  /// In en, this message translates to:
+  /// **'This line belongs to the {budget} budget: changes are made there.'**
+  String heldIn(String budget);
 }
 
 class _AppLocalizationsDelegate

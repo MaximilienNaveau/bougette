@@ -68,7 +68,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -513783489;
+  int get rustContentHash => 21788536;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -170,6 +170,12 @@ abstract class RustLibApi extends BaseApi {
 
   Future<void> crateApiAppLeave({required App that, required String budget});
 
+  Future<LineDetail> crateApiAppLineDetail({
+    required App that,
+    required String budget,
+    required String line,
+  });
+
   Future<void> crateApiAppLinkDevice({required App that, required String code});
 
   Future<List<MemberRow>> crateApiAppMembers({
@@ -212,6 +218,13 @@ abstract class RustLibApi extends BaseApi {
     required String member,
   });
 
+  Future<void> crateApiAppRemoveRevision({
+    required App that,
+    required String budget,
+    required String line,
+    required String from,
+  });
+
   Future<void> crateApiAppRemoveTransaction({
     required App that,
     required String budget,
@@ -224,6 +237,14 @@ abstract class RustLibApi extends BaseApi {
     required String name,
   });
 
+  Future<void> crateApiAppRenameLine({
+    required App that,
+    required String budget,
+    required String line,
+    required String name,
+    required String category,
+  });
+
   Future<ServerInfo?> crateApiAppServer({required App that});
 
   Future<void> crateApiAppSetName({required App that, required String name});
@@ -232,6 +253,16 @@ abstract class RustLibApi extends BaseApi {
     required App that,
     required String budget,
     required bool personal,
+  });
+
+  Future<void> crateApiAppSetRevision({
+    required App that,
+    required String budget,
+    required String line,
+    String? replacing,
+    required String from,
+    required PlatformInt64 amount,
+    Repeat? repeat,
   });
 
   Future<void> crateApiAppSetRole({
@@ -864,6 +895,45 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "App_leave", argNames: ["that", "budget"]);
 
   @override
+  Future<LineDetail> crateApiAppLineDetail({
+    required App that,
+    required String budget,
+    required String line,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerApp(
+            that,
+            serializer,
+          );
+          sse_encode_String(budget, serializer);
+          sse_encode_String(line, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 15,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_line_detail,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiAppLineDetailConstMeta,
+        argValues: [that, budget, line],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiAppLineDetailConstMeta => const TaskConstMeta(
+    debugName: "App_line_detail",
+    argNames: ["that", "budget", "line"],
+  );
+
+  @override
   Future<void> crateApiAppLinkDevice({
     required App that,
     required String code,
@@ -880,7 +950,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 15,
+            funcId: 16,
             port: port_,
           );
         },
@@ -917,7 +987,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 16,
+            funcId: 17,
             port: port_,
           );
         },
@@ -956,7 +1026,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 18,
             port: port_,
           );
         },
@@ -993,7 +1063,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 18,
+            funcId: 19,
             port: port_,
           );
         },
@@ -1026,7 +1096,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 19,
+            funcId: 20,
             port: port_,
           );
         },
@@ -1054,7 +1124,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 20,
+            funcId: 21,
             port: port_,
           );
         },
@@ -1096,7 +1166,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 21,
+            funcId: 22,
             port: port_,
           );
         },
@@ -1135,7 +1205,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 22,
+            funcId: 23,
             port: port_,
           );
         },
@@ -1174,7 +1244,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 23,
+            funcId: 24,
             port: port_,
           );
         },
@@ -1192,6 +1262,47 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiAppRemoveMemberConstMeta => const TaskConstMeta(
     debugName: "App_remove_member",
     argNames: ["that", "budget", "member"],
+  );
+
+  @override
+  Future<void> crateApiAppRemoveRevision({
+    required App that,
+    required String budget,
+    required String line,
+    required String from,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerApp(
+            that,
+            serializer,
+          );
+          sse_encode_String(budget, serializer);
+          sse_encode_String(line, serializer);
+          sse_encode_String(from, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 25,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiAppRemoveRevisionConstMeta,
+        argValues: [that, budget, line, from],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiAppRemoveRevisionConstMeta => const TaskConstMeta(
+    debugName: "App_remove_revision",
+    argNames: ["that", "budget", "line", "from"],
   );
 
   @override
@@ -1213,7 +1324,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 24,
+            funcId: 26,
             port: port_,
           );
         },
@@ -1253,7 +1364,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 25,
+            funcId: 27,
             port: port_,
           );
         },
@@ -1274,6 +1385,49 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  Future<void> crateApiAppRenameLine({
+    required App that,
+    required String budget,
+    required String line,
+    required String name,
+    required String category,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerApp(
+            that,
+            serializer,
+          );
+          sse_encode_String(budget, serializer);
+          sse_encode_String(line, serializer);
+          sse_encode_String(name, serializer);
+          sse_encode_String(category, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 28,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiAppRenameLineConstMeta,
+        argValues: [that, budget, line, name, category],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiAppRenameLineConstMeta => const TaskConstMeta(
+    debugName: "App_rename_line",
+    argNames: ["that", "budget", "line", "name", "category"],
+  );
+
+  @override
   Future<ServerInfo?> crateApiAppServer({required App that}) {
     return handler.executeNormal(
       NormalTask(
@@ -1286,7 +1440,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 26,
+            funcId: 29,
             port: port_,
           );
         },
@@ -1318,7 +1472,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 27,
+            funcId: 30,
             port: port_,
           );
         },
@@ -1357,7 +1511,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 28,
+            funcId: 31,
             port: port_,
           );
         },
@@ -1375,6 +1529,61 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiAppSetPersonalConstMeta => const TaskConstMeta(
     debugName: "App_set_personal",
     argNames: ["that", "budget", "personal"],
+  );
+
+  @override
+  Future<void> crateApiAppSetRevision({
+    required App that,
+    required String budget,
+    required String line,
+    String? replacing,
+    required String from,
+    required PlatformInt64 amount,
+    Repeat? repeat,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerApp(
+            that,
+            serializer,
+          );
+          sse_encode_String(budget, serializer);
+          sse_encode_String(line, serializer);
+          sse_encode_opt_String(replacing, serializer);
+          sse_encode_String(from, serializer);
+          sse_encode_i_64(amount, serializer);
+          sse_encode_opt_box_autoadd_repeat(repeat, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 32,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiAppSetRevisionConstMeta,
+        argValues: [that, budget, line, replacing, from, amount, repeat],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiAppSetRevisionConstMeta => const TaskConstMeta(
+    debugName: "App_set_revision",
+    argNames: [
+      "that",
+      "budget",
+      "line",
+      "replacing",
+      "from",
+      "amount",
+      "repeat",
+    ],
   );
 
   @override
@@ -1398,7 +1607,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 29,
+            funcId: 33,
             port: port_,
           );
         },
@@ -1435,7 +1644,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 30,
+            funcId: 34,
             port: port_,
           );
         },
@@ -1468,7 +1677,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 31,
+            funcId: 35,
             port: port_,
           );
         },
@@ -1604,6 +1813,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  LineDetail dco_decode_line_detail(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return LineDetail(
+      id: dco_decode_String(arr[0]),
+      name: dco_decode_String(arr[1]),
+      category: dco_decode_String(arr[2]),
+      heldIn: dco_decode_opt_String(arr[3]),
+      endsOn: dco_decode_opt_String(arr[4]),
+      revisions: dco_decode_list_revision_row(arr[5]),
+    );
+  }
+
+  @protected
   LineRow dco_decode_line_row(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -1666,6 +1891,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as Uint8List;
+  }
+
+  @protected
+  List<RevisionRow> dco_decode_list_revision_row(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_revision_row).toList();
   }
 
   @protected
@@ -1783,6 +2014,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Repeat dco_decode_repeat(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return Repeat.values[raw as int];
+  }
+
+  @protected
+  RevisionRow dco_decode_revision_row(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return RevisionRow(
+      from: dco_decode_String(arr[0]),
+      amount: dco_decode_i_64(arr[1]),
+      repeat: dco_decode_opt_box_autoadd_repeat(arr[2]),
+    );
   }
 
   @protected
@@ -1995,6 +2239,25 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  LineDetail sse_decode_line_detail(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_name = sse_decode_String(deserializer);
+    var var_category = sse_decode_String(deserializer);
+    var var_heldIn = sse_decode_opt_String(deserializer);
+    var var_endsOn = sse_decode_opt_String(deserializer);
+    var var_revisions = sse_decode_list_revision_row(deserializer);
+    return LineDetail(
+      id: var_id,
+      name: var_name,
+      category: var_category,
+      heldIn: var_heldIn,
+      endsOn: var_endsOn,
+      revisions: var_revisions,
+    );
+  }
+
+  @protected
   LineRow sse_decode_line_row(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_id = sse_decode_String(deserializer);
@@ -2108,6 +2371,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var len_ = sse_decode_i_32(deserializer);
     return deserializer.buffer.getUint8List(len_);
+  }
+
+  @protected
+  List<RevisionRow> sse_decode_list_revision_row(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <RevisionRow>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_revision_row(deserializer));
+    }
+    return ans_;
   }
 
   @protected
@@ -2276,6 +2551,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
     return Repeat.values[inner];
+  }
+
+  @protected
+  RevisionRow sse_decode_revision_row(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_from = sse_decode_String(deserializer);
+    var var_amount = sse_decode_i_64(deserializer);
+    var var_repeat = sse_decode_opt_box_autoadd_repeat(deserializer);
+    return RevisionRow(from: var_from, amount: var_amount, repeat: var_repeat);
   }
 
   @protected
@@ -2484,6 +2768,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_line_detail(LineDetail self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.name, serializer);
+    sse_encode_String(self.category, serializer);
+    sse_encode_opt_String(self.heldIn, serializer);
+    sse_encode_opt_String(self.endsOn, serializer);
+    sse_encode_list_revision_row(self.revisions, serializer);
+  }
+
+  @protected
   void sse_encode_line_row(LineRow self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.id, serializer);
@@ -2575,6 +2870,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.length, serializer);
     serializer.buffer.putUint8List(self);
+  }
+
+  @protected
+  void sse_encode_list_revision_row(
+    List<RevisionRow> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_revision_row(item, serializer);
+    }
   }
 
   @protected
@@ -2710,6 +3017,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_repeat(Repeat self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_revision_row(RevisionRow self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.from, serializer);
+    sse_encode_i_64(self.amount, serializer);
+    sse_encode_opt_box_autoadd_repeat(self.repeat, serializer);
   }
 
   @protected
@@ -2976,6 +3291,16 @@ class AppImpl extends RustOpaque implements App {
   Future<void> leave({required String budget}) =>
       RustLib.instance.api.crateApiAppLeave(that: this, budget: budget);
 
+  /// Line `line` of `budget`, with all its amounts over time.
+  Future<LineDetail> lineDetail({
+    required String budget,
+    required String line,
+  }) => RustLib.instance.api.crateApiAppLineDetail(
+    that: this,
+    budget: budget,
+    line: line,
+  );
+
   /// Makes this new device one of the member's, with a device code.
   Future<void> linkDevice({required String code}) =>
       RustLib.instance.api.crateApiAppLinkDevice(that: this, code: code);
@@ -3031,6 +3356,18 @@ class AppImpl extends RustOpaque implements App {
         member: member,
       );
 
+  /// Removes the amount of line `line` starting on `from`.
+  Future<void> removeRevision({
+    required String budget,
+    required String line,
+    required String from,
+  }) => RustLib.instance.api.crateApiAppRemoveRevision(
+    that: this,
+    budget: budget,
+    line: line,
+    from: from,
+  );
+
   /// Removes transaction `transaction`: from the budget that holds it,
   /// if it's seen here as a reflection.
   Future<void> removeTransaction({
@@ -3050,6 +3387,20 @@ class AppImpl extends RustOpaque implements App {
         name: name,
       );
 
+  /// Renames line `line`, or moves it to another category.
+  Future<void> renameLine({
+    required String budget,
+    required String line,
+    required String name,
+    required String category,
+  }) => RustLib.instance.api.crateApiAppRenameLine(
+    that: this,
+    budget: budget,
+    line: line,
+    name: name,
+    category: category,
+  );
+
   /// The server this device joined, if any.
   Future<ServerInfo?> server() =>
       RustLib.instance.api.crateApiAppServer(that: this);
@@ -3066,6 +3417,30 @@ class AppImpl extends RustOpaque implements App {
         budget: budget,
         personal: personal,
       );
+
+  /// Sets one amount of line `line`: the one from `replacing` if given
+  /// (possibly moved to `from`), else a new one from `from`. Others stay.
+  /// `repeat`: how it repeats, or `None` to keep how it did.
+  ///
+  /// The due days stay the line's: an amount keeps its own, a new or
+  /// moved one follows the amount before it, and the first amount's date
+  /// is the line's first due date.
+  Future<void> setRevision({
+    required String budget,
+    required String line,
+    String? replacing,
+    required String from,
+    required PlatformInt64 amount,
+    Repeat? repeat,
+  }) => RustLib.instance.api.crateApiAppSetRevision(
+    that: this,
+    budget: budget,
+    line: line,
+    replacing: replacing,
+    from: from,
+    amount: amount,
+    repeat: repeat,
+  );
 
   /// Gives `member` the role `role` in `budget` (an Admin only).
   Future<void> setRole({

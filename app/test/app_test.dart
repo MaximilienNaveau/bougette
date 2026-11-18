@@ -88,10 +88,27 @@ void main() {
     expect(find.text('Vélo'), findsOneWidget);
     expect(find.text('goal €1,200.00'), findsOneWidget);
 
-    // The rent has no transaction: it can be removed.
+    // The rent in full: its amounts as a table, a change added to it.
     await tester.tap(find.text('Loyer (Logement)'));
     await settle(tester);
-    await tester.tap(find.text('Remove it'));
+    expect(find.text('Start'), findsOneWidget);
+    expect(find.text('€1,100.00'), findsOneWidget);
+    await tester.tap(find.text('Add a change'));
+    await settle(tester);
+    await tester.enterText(find.widgetWithText(TextField, 'Amount'), '1200');
+    await tester.tap(find.text('OK'));
+    await settle(tester);
+    expect(find.text('Change 1'), findsOneWidget);
+    expect(find.text('€1,200.00'), findsOneWidget);
+    // Removed again from the table (the start has a button too).
+    await tester.tap(find.byTooltip('Remove this change').last);
+    await settle(tester);
+    await tester.tap(find.text('Yes'));
+    await settle(tester);
+    expect(find.text('Change 1'), findsNothing);
+
+    // The rent has no transaction: it can be removed.
+    await tester.tap(find.byTooltip('Remove it'));
     await settle(tester);
     await tester.tap(find.text('Yes'));
     await settle(tester);

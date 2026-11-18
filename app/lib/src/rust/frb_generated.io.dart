@@ -77,6 +77,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 dco_decode_i_64(dynamic raw);
 
   @protected
+  LineDetail dco_decode_line_detail(dynamic raw);
+
+  @protected
   LineRow dco_decode_line_row(dynamic raw);
 
   @protected
@@ -99,6 +102,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  List<RevisionRow> dco_decode_list_revision_row(dynamic raw);
 
   @protected
   List<TransactionRow> dco_decode_list_transaction_row(dynamic raw);
@@ -135,6 +141,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Repeat dco_decode_repeat(dynamic raw);
+
+  @protected
+  RevisionRow dco_decode_revision_row(dynamic raw);
 
   @protected
   ServerInfo dco_decode_server_info(dynamic raw);
@@ -218,6 +227,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
 
   @protected
+  LineDetail sse_decode_line_detail(SseDeserializer deserializer);
+
+  @protected
   LineRow sse_decode_line_row(SseDeserializer deserializer);
 
   @protected
@@ -244,6 +256,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
+  List<RevisionRow> sse_decode_list_revision_row(SseDeserializer deserializer);
 
   @protected
   List<TransactionRow> sse_decode_list_transaction_row(
@@ -286,6 +301,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Repeat sse_decode_repeat(SseDeserializer deserializer);
+
+  @protected
+  RevisionRow sse_decode_revision_row(SseDeserializer deserializer);
 
   @protected
   ServerInfo sse_decode_server_info(SseDeserializer deserializer);
@@ -381,6 +399,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
 
   @protected
+  void sse_encode_line_detail(LineDetail self, SseSerializer serializer);
+
+  @protected
   void sse_encode_line_row(LineRow self, SseSerializer serializer);
 
   @protected
@@ -416,6 +437,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_revision_row(
+    List<RevisionRow> self,
     SseSerializer serializer,
   );
 
@@ -469,6 +496,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_repeat(Repeat self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_revision_row(RevisionRow self, SseSerializer serializer);
 
   @protected
   void sse_encode_server_info(ServerInfo self, SseSerializer serializer);

@@ -110,6 +110,31 @@ pub struct LineRow {
     pub reflected: bool,
 }
 
+/// One amount of a line, from a date until the next change (GLOSSARY.md:
+/// Revision).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RevisionRow {
+    /// `2026-11-30`: for the first, the line's start and first due date.
+    pub from: String,
+    pub amount: i64,
+    /// `None` for a schedule the app can't show (see `LineRow::repeat`).
+    pub repeat: Option<Repeat>,
+}
+
+/// A line with all its amounts over time, to edit it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LineDetail {
+    pub id: String,
+    pub name: String,
+    pub category: String,
+    /// The other budget holding it, by name, if it's seen in a personal
+    /// budget (a planned contribution): changes go there.
+    pub held_in: Option<String>,
+    pub ends_on: Option<String>,
+    /// Oldest first; never empty.
+    pub revisions: Vec<RevisionRow>,
+}
+
 /// Another budget, to choose where a line's money goes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BudgetChoice {
@@ -383,6 +408,118 @@ impl App {
                 .map_or(from, |revision| revision.schedule.first());
             budget.change_line(id, from, amount, schedule(repeat, first))
         })
+    }
+
+    /// Line `line` of `budget`, with all its amounts over time.
+    pub fn line_detail(&self, budget: String, line: String) -> Result<LineDetail, String> {
+        let id = LineId(parse_id(&line)?);
+        let holder = self.holder_of_line(&budget, id)?;
+        // `as_ref` borrows the Budget inside the Option, so `holder` can
+        // still be moved into `budget` below.
+        let held_in = holder.as_ref().map(|holder| holder.name.clone());
+        let budget = match holder {
+            Some(holder) => holder,
+            None => self.load(&budget)?,
+        };
+        let line = budget
+            .line(id)
+            .ok_or_else(|| BudgetError::UnknownLine.to_string())?;
+        Ok(LineDetail {
+            id: line.id.to_string(),
+            name: line.name.clone(),
+            category: line.category.clone(),
+            held_in,
+            ends_on: line.ends_on().map(|day| day.to_string()),
+            revisions: line
+                .revisions()
+                .iter()
+                .map(|revision| RevisionRow {
+                    from: revision.from.to_string(),
+                    amount: revision.amount.minor_units(),
+                    repeat: repeat_of(revision.schedule),
+                })
+                .collect(),
+        })
+    }
+
+    /// Sets one amount of line `line`: the one from `replacing` if given
+    /// (possibly moved to `from`), else a new one from `from`. Others stay.
+    /// `repeat`: how it repeats, or `None` to keep how it did.
+    ///
+    /// The due days stay the line's: an amount keeps its own, a new or
+    /// moved one follows the amount before it, and the first amount's date
+    /// is the line's first due date.
+    #[allow(clippy::too_many_arguments)] // the fields of a revision
+    pub fn set_revision(
+        &self,
+        budget: String,
+        line: String,
+        replacing: Option<String>,
+        from: String,
+        amount: i64,
+        repeat: Option<Repeat>,
+    ) -> Result<(), String> {
+        let id = LineId(parse_id(&line)?);
+        let replacing = replacing.map(|day| date(&day)).transpose()?;
+        let from = date(&from)?;
+        let budget = self.line_home(budget, id)?;
+        self.change(&budget, |budget| {
+            let line = budget.line(id).ok_or(BudgetError::UnknownLine)?;
+            let revisions = line.revisions();
+            // The amount edited, if any, and the last other one before
+            // `from`.
+            let old = revisions
+                .iter()
+                .find(|revision| Some(revision.from) == replacing);
+            // `rfind`: the first match from the end, the revisions being
+            // in date order.
+            let previous = revisions
+                .iter()
+                .rfind(|revision| Some(revision.from) != replacing && revision.from < from);
+            let first = match (old, previous) {
+                (Some(old), _) if old.from == from => old.schedule.first(),
+                (_, Some(previous)) => previous.schedule.first(),
+                (_, None) => from, // the new start
+            };
+            let schedule = match repeat {
+                Some(repeat) => schedule(repeat, first),
+                // `or` falls back on the next Option; the line has at least
+                // one revision, so `revisions[0]` exists.
+                None => old
+                    .or(previous)
+                    .unwrap_or(&revisions[0])
+                    .schedule
+                    .starting(first),
+            };
+            let amount = Money::new(amount, budget.currency());
+            budget.set_revision(id, replacing, from, amount, schedule)
+        })
+    }
+
+    /// Removes the amount of line `line` starting on `from`.
+    pub fn remove_revision(
+        &self,
+        budget: String,
+        line: String,
+        from: String,
+    ) -> Result<(), String> {
+        let id = LineId(parse_id(&line)?);
+        let from = date(&from)?;
+        let budget = self.line_home(budget, id)?;
+        self.change(&budget, |budget| budget.remove_revision(id, from))
+    }
+
+    /// Renames line `line`, or moves it to another category.
+    pub fn rename_line(
+        &self,
+        budget: String,
+        line: String,
+        name: String,
+        category: String,
+    ) -> Result<(), String> {
+        let id = LineId(parse_id(&line)?);
+        let budget = self.line_home(budget, id)?;
+        self.change(&budget, |budget| budget.rename_line(id, name, category))
     }
 
     /// Line `line` stops after `last_day`, or goes on again with `None`.
@@ -1129,5 +1266,79 @@ mod tests {
             .end_line(id, salary, Some("2026-11-17".into()))
             .unwrap_err();
         assert!(refused.contains("remove it instead"), "{refused}");
+    }
+
+    #[test]
+    fn a_line_is_edited_as_a_table_of_amounts() {
+        let app = app();
+        let id = app.create_budget("Home".into(), "EUR".into()).unwrap();
+        let salary = app
+            .add_line(
+                id.clone(),
+                "Salary".into(),
+                "Income".into(),
+                true,
+                300000,
+                Repeat::Monthly,
+                "2026-01-30".into(),
+                None,
+                None,
+            )
+            .unwrap();
+        let set = |replacing: Option<&str>, from: &str, amount| {
+            app.set_revision(
+                id.clone(),
+                salary.clone(),
+                replacing.map(String::from),
+                from.into(),
+                amount,
+                None,
+            )
+        };
+        // Two raises, entered on the 1st: still paid on the 30th.
+        set(None, "2026-04-01", 310000).unwrap();
+        set(None, "2026-09-01", 320000).unwrap();
+        // The first raise was 3,150 in fact.
+        set(Some("2026-04-01"), "2026-04-01", 315000).unwrap();
+        let detail = app.line_detail(id.clone(), salary.clone()).unwrap();
+        let rows: Vec<(&str, i64)> = detail
+            .revisions
+            .iter()
+            .map(|row| (row.from.as_str(), row.amount))
+            .collect();
+        assert_eq!(
+            rows,
+            [
+                ("2026-01-30", 300000),
+                ("2026-04-01", 315000),
+                ("2026-09-01", 320000)
+            ]
+        );
+        assert_eq!(detail.revisions[1].repeat, Some(Repeat::Monthly));
+        assert_eq!(detail.held_in, None);
+        let line = app.load(&id).unwrap().lines()[0].clone();
+        assert!(
+            line.revisions()
+                .iter()
+                .all(|revision| revision.schedule.first() == day(2026, 1, 30))
+        );
+
+        // The start moves to February: the first due date with it.
+        set(Some("2026-01-30"), "2026-02-27", 300000).unwrap();
+        let line = app.load(&id).unwrap().lines()[0].clone();
+        assert_eq!(line.starts_on(), day(2026, 2, 27));
+        assert_eq!(line.revisions()[0].schedule.first(), day(2026, 2, 27));
+
+        // A change removed, then a rename.
+        app.remove_revision(id.clone(), salary.clone(), "2026-09-01".into())
+            .unwrap();
+        app.rename_line(id.clone(), salary.clone(), "Pay".into(), "Work".into())
+            .unwrap();
+        let detail = app.line_detail(id, salary).unwrap();
+        assert_eq!(detail.revisions.len(), 2);
+        assert_eq!(
+            (detail.name.as_str(), detail.category.as_str()),
+            ("Pay", "Work")
+        );
     }
 }

@@ -111,6 +111,15 @@ impl Schedule {
         }
     }
 
+    /// The same repetition, following on from `first` instead.
+    pub fn starting(self, first: Date) -> Schedule {
+        match self {
+            Schedule::Months { every, .. } => Schedule::Months { every, first },
+            Schedule::Weekly { .. } => Schedule::Weekly { first },
+            Schedule::Once { .. } => Schedule::Once { on: first },
+        }
+    }
+
     /// `amount`, due on this schedule, spread evenly over `period`: e.g.
     /// €480 every 12 months is €40 a month. `None` for a one-off line,
     /// which is never smoothed (doc/scope.md).

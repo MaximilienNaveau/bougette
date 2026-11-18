@@ -9,7 +9,7 @@ import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `budgets_on`, `calendar_on`, `change`, `date`, `destinations`, `edit`, `holder_of_line`, `kind`, `line_home`, `load`, `lock`, `month_on`, `month_text`, `parse_id`, `parse_month`, `repeat_of`, `schedule`, `shown`, `source`, `status`, `stored`, `today`, `totals`, `with`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<App>>
 abstract class App implements RustOpaqueInterface {
@@ -111,6 +111,9 @@ abstract class App implements RustOpaqueInterface {
   /// This member leaves `budget`.
   Future<void> leave({required String budget});
 
+  /// Line `line` of `budget`, with all its amounts over time.
+  Future<LineDetail> lineDetail({required String budget, required String line});
+
   /// Makes this new device one of the member's, with a device code.
   Future<void> linkDevice({required String code});
 
@@ -146,6 +149,13 @@ abstract class App implements RustOpaqueInterface {
   /// had, and get nothing new.
   Future<void> removeMember({required String budget, required String member});
 
+  /// Removes the amount of line `line` starting on `from`.
+  Future<void> removeRevision({
+    required String budget,
+    required String line,
+    required String from,
+  });
+
   /// Removes transaction `transaction`: from the budget that holds it,
   /// if it's seen here as a reflection.
   Future<void> removeTransaction({
@@ -156,6 +166,14 @@ abstract class App implements RustOpaqueInterface {
   /// Renames budget `budget`.
   Future<void> renameBudget({required String budget, required String name});
 
+  /// Renames line `line`, or moves it to another category.
+  Future<void> renameLine({
+    required String budget,
+    required String line,
+    required String name,
+    required String category,
+  });
+
   /// The server this device joined, if any.
   Future<ServerInfo?> server();
 
@@ -165,6 +183,22 @@ abstract class App implements RustOpaqueInterface {
   /// Makes `budget` this member's personal budget, or not: their
   /// contributions and advances in shared budgets show in it.
   Future<void> setPersonal({required String budget, required bool personal});
+
+  /// Sets one amount of line `line`: the one from `replacing` if given
+  /// (possibly moved to `from`), else a new one from `from`. Others stay.
+  /// `repeat`: how it repeats, or `None` to keep how it did.
+  ///
+  /// The due days stay the line's: an amount keeps its own, a new or
+  /// moved one follows the amount before it, and the first amount's date
+  /// is the line's first due date.
+  Future<void> setRevision({
+    required String budget,
+    required String line,
+    String? replacing,
+    required String from,
+    required PlatformInt64 amount,
+    Repeat? repeat,
+  });
 
   /// Gives `member` the role `role` in `budget` (an Admin only).
   Future<void> setRole({
@@ -243,6 +277,51 @@ class BudgetSummary {
           monthlyBalance == other.monthlyBalance &&
           runningBalance == other.runningBalance &&
           personal == other.personal;
+}
+
+/// A line with all its amounts over time, to edit it.
+class LineDetail {
+  final String id;
+  final String name;
+  final String category;
+
+  /// The other budget holding it, by name, if it's seen in a personal
+  /// budget (a planned contribution): changes go there.
+  final String? heldIn;
+  final String? endsOn;
+
+  /// Oldest first; never empty.
+  final List<RevisionRow> revisions;
+
+  const LineDetail({
+    required this.id,
+    required this.name,
+    required this.category,
+    this.heldIn,
+    this.endsOn,
+    required this.revisions,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      name.hashCode ^
+      category.hashCode ^
+      heldIn.hashCode ^
+      endsOn.hashCode ^
+      revisions.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LineDetail &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name &&
+          category == other.category &&
+          heldIn == other.heldIn &&
+          endsOn == other.endsOn &&
+          revisions == other.revisions;
 }
 
 /// A line in a month.
@@ -506,6 +585,31 @@ enum Repeat {
   yearly,
   weekly,
   once,
+}
+
+/// One amount of a line, from a date until the next change (GLOSSARY.md:
+/// Revision).
+class RevisionRow {
+  /// `2026-11-30`: for the first, the line's start and first due date.
+  final String from;
+  final PlatformInt64 amount;
+
+  /// `None` for a schedule the app can't show (see `LineRow::repeat`).
+  final Repeat? repeat;
+
+  const RevisionRow({required this.from, required this.amount, this.repeat});
+
+  @override
+  int get hashCode => from.hashCode ^ amount.hashCode ^ repeat.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RevisionRow &&
+          runtimeType == other.runtimeType &&
+          from == other.from &&
+          amount == other.amount &&
+          repeat == other.repeat;
 }
 
 /// Where a month's figures come from, seen from today.

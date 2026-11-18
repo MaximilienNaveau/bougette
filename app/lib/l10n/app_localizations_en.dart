@@ -196,26 +196,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get byADate => 'By a date';
 
   @override
-  String get changeFromDate => 'Change the amount from a date…';
-
-  @override
   String get endIt => 'End it…';
 
   @override
-  String endsChange(String date) {
-    return 'Ends $date: change…';
-  }
-
-  @override
   String get removeIt => 'Remove it';
-
-  @override
-  String changeLine(String name) {
-    return 'Change $name';
-  }
-
-  @override
-  String get monthsBeforeKeep => 'The months before keep the old amount.';
 
   @override
   String endLine(String name) {
@@ -409,5 +393,40 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String removeThereToo(String budget) {
     return 'Remove this transaction? It is removed from $budget too.';
+  }
+
+  @override
+  String get amounts => 'Amounts over time';
+
+  @override
+  String get start => 'Start';
+
+  @override
+  String changeNumber(int number) {
+    return 'Change $number';
+  }
+
+  @override
+  String get repeats => 'Repeats';
+
+  @override
+  String get addChange => 'Add a change';
+
+  @override
+  String get changeAmount => 'Change this amount';
+
+  @override
+  String get asBefore => 'As before';
+
+  @override
+  String get removeAmount => 'Remove this change';
+
+  @override
+  String get removeAmountQuestion =>
+      'Remove this change? The amount before goes on.';
+
+  @override
+  String heldIn(String budget) {
+    return 'This line belongs to the $budget budget: changes are made there.';
   }
 }

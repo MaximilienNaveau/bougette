@@ -71,6 +71,10 @@ pub enum LineError {
     BeforeStart,
     /// The amount is zero or negative.
     NotPositive,
+    /// No revision starts on that date.
+    NoSuchRevision,
+    /// A line keeps at least one revision: remove the line instead.
+    OnlyRevision,
 }
 
 impl Line {
@@ -156,6 +160,66 @@ impl Line {
             schedule,
         });
         // `Ok(())`: success with nothing to return (`()` is like `void`).
+        Ok(())
+    }
+
+    /// Sets one revision, leaving the others as they are: the one starting
+    /// on `replacing` if given (it may move to `from`), else a new one
+    /// from `from`. A revision already starting on `from` is replaced.
+    /// One starting before the line moves its start earlier.
+    pub fn set_revision(
+        &mut self,
+        replacing: Option<Date>,
+        from: Date,
+        amount: Money,
+        schedule: Schedule,
+    ) -> Result<(), LineError> {
+        if amount.minor_units() <= 0 {
+            return Err(LineError::NotPositive);
+        }
+        // Work on a copy, kept only if the result is valid: either the
+        // whole change happens or none of it (like a transaction).
+        let mut revisions = self.revisions.clone();
+        if let Some(old) = replacing {
+            let count = revisions.len();
+            revisions.retain(|revision| revision.from != old);
+            if revisions.len() == count {
+                return Err(LineError::NoSuchRevision);
+            }
+        }
+        revisions.retain(|revision| revision.from != from);
+        revisions.push(Revision {
+            from,
+            amount,
+            schedule,
+        });
+        // Back in date order. `sort_by_key` is `std::sort` with a key.
+        revisions.sort_by_key(|revision| revision.from);
+        self.replace_revisions(revisions)
+    }
+
+    /// Removes the revision starting on `from`: the one before it then
+    /// goes on. Removing the first one makes the line start at the next.
+    pub fn remove_revision(&mut self, from: Date) -> Result<(), LineError> {
+        if self.revisions.len() == 1 {
+            return Err(LineError::OnlyRevision);
+        }
+        let mut revisions = self.revisions.clone();
+        let count = revisions.len();
+        revisions.retain(|revision| revision.from != from);
+        if revisions.len() == count {
+            return Err(LineError::NoSuchRevision);
+        }
+        self.replace_revisions(revisions)
+    }
+
+    /// Takes `revisions` (sorted, not empty) unless the line would then
+    /// end before it starts.
+    fn replace_revisions(&mut self, revisions: Vec<Revision>) -> Result<(), LineError> {
+        if self.ends_on.is_some_and(|end| end < revisions[0].from) {
+            return Err(LineError::BeforeStart);
+        }
+        self.revisions = revisions;
         Ok(())
     }
 
@@ -305,6 +369,71 @@ mod tests {
         assert_eq!(line.amount_in(month(2026, 6), View::Due), eur(90000));
         assert_eq!(line.amount_in(month(2026, 7), View::Due), eur(95000));
         assert_eq!(line.amount_in(month(2026, 7), View::Smoothed), eur(95000));
+    }
+
+    #[test]
+    fn each_revision_is_edited_moved_or_removed_alone() {
+        let mut line = rent(); // 900 from January
+        line.change_from(date(2026, 4, 1), eur(95000), monthly(date(2026, 1, 5)))
+            .unwrap();
+        line.change_from(date(2026, 9, 1), eur(99000), monthly(date(2026, 1, 5)))
+            .unwrap();
+        // The April change becomes 920, the September one stays.
+        line.set_revision(
+            Some(date(2026, 4, 1)),
+            date(2026, 4, 1),
+            eur(92000),
+            monthly(date(2026, 1, 5)),
+        )
+        .unwrap();
+        assert_eq!(line.amount_in(month(2026, 5), View::Due), eur(92000));
+        assert_eq!(line.amount_in(month(2026, 10), View::Due), eur(99000));
+        // Moved to June: May is back to the start's amount.
+        line.set_revision(
+            Some(date(2026, 4, 1)),
+            date(2026, 6, 1),
+            eur(92000),
+            monthly(date(2026, 1, 5)),
+        )
+        .unwrap();
+        assert_eq!(line.amount_in(month(2026, 5), View::Due), eur(90000));
+        assert_eq!(line.revisions().len(), 3);
+        // A new change in between keeps the others.
+        line.set_revision(
+            None,
+            date(2026, 7, 1),
+            eur(93000),
+            monthly(date(2026, 1, 5)),
+        )
+        .unwrap();
+        assert_eq!(line.revisions().len(), 4);
+        // Removing June's: the start's amount goes on until July.
+        line.remove_revision(date(2026, 6, 1)).unwrap();
+        assert_eq!(line.amount_in(month(2026, 6), View::Due), eur(90000));
+        assert_eq!(
+            line.remove_revision(date(2026, 6, 1)),
+            Err(LineError::NoSuchRevision)
+        );
+        // Removing the start: the line starts in July.
+        line.remove_revision(date(2026, 1, 1)).unwrap();
+        assert_eq!(line.starts_on(), date(2026, 7, 1));
+        line.remove_revision(date(2026, 9, 1)).unwrap();
+        assert_eq!(
+            line.remove_revision(date(2026, 7, 1)),
+            Err(LineError::OnlyRevision)
+        );
+        // Moving the start after the end is refused, and changes nothing.
+        line.end_on(Some(date(2026, 12, 31))).unwrap();
+        assert_eq!(
+            line.set_revision(
+                Some(date(2026, 7, 1)),
+                date(2027, 1, 1),
+                eur(1),
+                monthly(date(2027, 1, 5))
+            ),
+            Err(LineError::BeforeStart)
+        );
+        assert_eq!(line.starts_on(), date(2026, 7, 1));
     }
 
     #[test]

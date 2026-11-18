@@ -146,6 +146,10 @@ impl std::fmt::Display for BudgetError {
                 "the line would end before it starts: remove it instead"
             }
             BudgetError::Line(LineError::NotPositive) => "a line's amount must be positive",
+            BudgetError::Line(LineError::NoSuchRevision) => "no change of the line on that date",
+            BudgetError::Line(LineError::OnlyRevision) => {
+                "a line keeps at least one amount: remove the line instead"
+            }
             BudgetError::PayeeNeedsACost => {
                 "only a cost can be paid to a member, and not by a member"
             }
@@ -297,6 +301,42 @@ impl Budget {
     /// Line `id` stops after `last_day`, or goes on again with `None`.
     pub fn end_line(&mut self, id: LineId, last_day: Option<Date>) -> Result<(), BudgetError> {
         self.line_mut(id)?.end_on(last_day)?;
+        Ok(())
+    }
+
+    /// Sets one revision of line `id` (see `Line::set_revision`).
+    pub fn set_revision(
+        &mut self,
+        id: LineId,
+        replacing: Option<Date>,
+        from: Date,
+        amount: Money,
+        schedule: Schedule,
+    ) -> Result<(), BudgetError> {
+        if amount.currency() != self.currency {
+            return Err(BudgetError::WrongCurrency);
+        }
+        self.line_mut(id)?
+            .set_revision(replacing, from, amount, schedule)?;
+        Ok(())
+    }
+
+    /// Removes the revision of line `id` starting on `from`.
+    pub fn remove_revision(&mut self, id: LineId, from: Date) -> Result<(), BudgetError> {
+        self.line_mut(id)?.remove_revision(from)?;
+        Ok(())
+    }
+
+    /// Renames line `id`, or moves it to another category.
+    pub fn rename_line(
+        &mut self,
+        id: LineId,
+        name: impl Into<String>,
+        category: impl Into<String>,
+    ) -> Result<(), BudgetError> {
+        let line = self.line_mut(id)?;
+        line.name = name.into();
+        line.category = category.into();
         Ok(())
     }
 

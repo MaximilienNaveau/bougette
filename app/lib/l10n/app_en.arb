@@ -122,26 +122,8 @@
   },
   "goalOptional": "Goal (optional)",
   "byADate": "By a date",
-  "changeFromDate": "Change the amount from a date…",
   "endIt": "End it…",
-  "endsChange": "Ends {date}: change…",
-  "@endsChange": {
-    "placeholders": {
-      "date": {
-        "type": "String"
-      }
-    }
-  },
   "removeIt": "Remove it",
-  "changeLine": "Change {name}",
-  "@changeLine": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
-  "monthsBeforeKeep": "The months before keep the old amount.",
   "endLine": "End {name}",
   "@endLine": {
     "placeholders": {
@@ -249,6 +231,30 @@
   },
   "removeThereToo": "Remove this transaction? It is removed from {budget} too.",
   "@removeThereToo": {
+    "placeholders": {
+      "budget": {
+        "type": "String"
+      }
+    }
+  },
+  "amounts": "Amounts over time",
+  "start": "Start",
+  "changeNumber": "Change {number}",
+  "@changeNumber": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "repeats": "Repeats",
+  "addChange": "Add a change",
+  "changeAmount": "Change this amount",
+  "asBefore": "As before",
+  "removeAmount": "Remove this change",
+  "removeAmountQuestion": "Remove this change? The amount before goes on.",
+  "heldIn": "This line belongs to the {budget} budget: changes are made there.",
+  "@heldIn": {
     "placeholders": {
       "budget": {
         "type": "String"

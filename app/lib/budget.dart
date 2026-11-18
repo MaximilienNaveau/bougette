@@ -7,6 +7,7 @@
 import 'package:flutter/material.dart';
 
 import 'forms.dart';
+import 'line.dart';
 import 'look.dart';
 import 'members.dart';
 import 'month.dart';
@@ -79,6 +80,21 @@ class _BudgetScreenState extends State<BudgetScreen> {
   /// Runs a form, and reloads if it changed something.
   Future<void> _then(Future<bool> changed) async {
     if (await changed) _reload();
+  }
+
+  /// Opens a line in full, and reloads when back from it.
+  Future<void> _openLine(LineRow line, String currency) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => LineScreen(
+          app: widget.app,
+          budget: _budget,
+          line: line.id,
+          currency: currency,
+        ),
+      ),
+    );
+    _reload();
   }
 
   Future<void> _rename() async {
@@ -194,8 +210,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
                     ? const Center(child: CircularProgressIndicator())
                     : MonthBody(
                         view: view,
-                        onLine: (line) =>
-                            _then(editLine(context, app, _budget, line)),
+                        onLine: (line) => _openLine(line, currency),
                         onTransaction: (transaction) => _then(
                           removeTransaction(context, app, _budget, transaction),
                         ),
