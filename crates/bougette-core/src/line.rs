@@ -67,7 +67,7 @@ pub struct Line {
 /// Why a change to a line was refused.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LineError {
-    /// The date is before the line starts.
+    /// The line would end before it starts.
     BeforeStart,
     /// The amount is zero or negative.
     NotPositive,
@@ -129,7 +129,9 @@ impl Line {
 
     /// From `from` on, the line has a new amount and schedule; months
     /// before keep the old ones (doc/scope.md). Revisions from `from` or
-    /// later are replaced.
+    /// later are replaced. A change from before the line starts (e.g. from
+    /// the 17th for a salary first due on the 30th) applies from its start:
+    /// there is nothing before to keep.
     // `&mut self`: the method changes the line, like a non-const member
     // function. The borrow checker guarantees nobody else is reading the
     // line while it changes, so no iterator over `revisions` can be
@@ -140,9 +142,8 @@ impl Line {
         amount: Money,
         schedule: Schedule,
     ) -> Result<(), LineError> {
-        if from < self.starts_on() {
-            return Err(LineError::BeforeStart);
-        }
+        // `max` of two dates: the later one, like `std::max`.
+        let from = from.max(self.starts_on());
         if amount.minor_units() <= 0 {
             return Err(LineError::NotPositive);
         }
@@ -304,9 +305,29 @@ mod tests {
         assert_eq!(line.amount_in(month(2026, 6), View::Due), eur(90000));
         assert_eq!(line.amount_in(month(2026, 7), View::Due), eur(95000));
         assert_eq!(line.amount_in(month(2026, 7), View::Smoothed), eur(95000));
-        // A change before the line starts makes no sense.
+    }
+
+    #[test]
+    fn a_change_from_before_the_start_applies_from_the_start() {
+        // A salary first due on the 30th, changed from the 17th.
+        let mut salary = Line::new(
+            "Salary",
+            "Income",
+            Kind::Income,
+            date(2026, 11, 30),
+            eur(300000),
+            monthly(date(2026, 11, 30)),
+        )
+        .unwrap();
+        salary
+            .change_from(date(2026, 11, 17), eur(310000), monthly(date(2026, 11, 30)))
+            .unwrap();
+        assert_eq!(salary.starts_on(), date(2026, 11, 30));
+        assert_eq!(salary.revisions().len(), 1);
+        assert_eq!(salary.amount_in(month(2026, 11), View::Due), eur(310000));
+        // Ending it before it starts would leave nothing: that's removing.
         assert_eq!(
-            line.change_from(date(2025, 12, 1), eur(1), monthly(date(2026, 1, 5))),
+            salary.end_on(Some(date(2026, 11, 17))),
             Err(LineError::BeforeStart)
         );
     }

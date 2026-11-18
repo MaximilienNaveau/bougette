@@ -142,7 +142,9 @@ impl std::fmt::Display for BudgetError {
             BudgetError::LineInUse => {
                 "the line has transactions: remove them first, or end the line"
             }
-            BudgetError::Line(LineError::BeforeStart) => "the date is before the line starts",
+            BudgetError::Line(LineError::BeforeStart) => {
+                "the line would end before it starts: remove it instead"
+            }
             BudgetError::Line(LineError::NotPositive) => "a line's amount must be positive",
             BudgetError::PayeeNeedsACost => {
                 "only a cost can be paid to a member, and not by a member"
@@ -907,9 +909,9 @@ mod tests {
             budget.compare_line(rent, month(2026, 4)).unwrap().planned,
             eur(95000)
         );
-        // A change before the line starts is the line's error, wrapped.
+        // Ending it before it starts is the line's error, wrapped.
         assert_eq!(
-            budget.change_line(rent, date(2025, 1, 1), eur(1), every(1, date(2025, 1, 1))),
+            budget.end_line(rent, Some(date(2025, 1, 1))),
             Err(BudgetError::Line(LineError::BeforeStart))
         );
         // Ended after June: nothing planned in July.

@@ -373,7 +373,15 @@ impl App {
         let budget = self.line_home(budget, id)?;
         self.change(&budget, |budget| {
             let amount = Money::new(amount, budget.currency());
-            budget.change_line(id, from, amount, schedule(repeat, from))
+            // Still due on the same days: the new schedule follows on from
+            // the line's first due date. `from` only says from when the
+            // change applies (a salary due on the 30th, changed from the
+            // 17th, stays due on the 30th).
+            let first = budget
+                .line(id)
+                .and_then(|line| line.revision_on(from).or(line.revisions().last()))
+                .map_or(from, |revision| revision.schedule.first());
+            budget.change_line(id, from, amount, schedule(repeat, first))
         })
     }
 
@@ -1068,5 +1076,58 @@ mod tests {
             )
             .unwrap_err();
         assert!(refused.contains("only a cost"), "{refused}");
+    }
+
+    #[test]
+    fn a_line_changed_before_its_first_due_date_keeps_its_due_day() {
+        let app = app();
+        let id = app.create_budget("Home".into(), "EUR".into()).unwrap();
+        // A salary first due on the 30th, changed on the 17th (what the
+        // form offers by default).
+        let salary = app
+            .add_line(
+                id.clone(),
+                "Salary".into(),
+                "Income".into(),
+                true,
+                300000,
+                Repeat::Monthly,
+                "2026-11-30".into(),
+                None,
+                None,
+            )
+            .unwrap();
+        app.change_line(
+            id.clone(),
+            salary.clone(),
+            310000,
+            Repeat::Monthly,
+            "2026-11-17".into(),
+        )
+        .unwrap();
+        let line = app.load(&id).unwrap().lines()[0].clone();
+        assert_eq!(line.starts_on(), day(2026, 11, 30));
+        assert_eq!(line.revisions()[0].schedule.first(), day(2026, 11, 30));
+        assert_eq!(line.revisions()[0].amount.minor_units(), 310000);
+
+        // Changed again from mid-December: still due on the 30th.
+        app.change_line(
+            id.clone(),
+            salary.clone(),
+            320000,
+            Repeat::Monthly,
+            "2026-12-15".into(),
+        )
+        .unwrap();
+        let line = app.load(&id).unwrap().lines()[0].clone();
+        assert_eq!(line.revisions()[1].schedule.first(), day(2026, 11, 30));
+        let december = app.month_on(&id, "2026-12", day(2026, 11, 17)).unwrap();
+        assert_eq!(december.lines[0].due, 320000);
+
+        // Ending it before it starts: refused, with what to do instead.
+        let refused = app
+            .end_line(id, salary, Some("2026-11-17".into()))
+            .unwrap_err();
+        assert!(refused.contains("remove it instead"), "{refused}");
     }
 }

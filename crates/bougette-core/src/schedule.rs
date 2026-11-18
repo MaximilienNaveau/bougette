@@ -102,6 +102,15 @@ impl Schedule {
         }
     }
 
+    /// The first due date: the one the others follow from.
+    pub fn first(&self) -> Date {
+        // `|` joins patterns binding the same name: either variant's date.
+        match *self {
+            Schedule::Months { first, .. } | Schedule::Weekly { first } => first,
+            Schedule::Once { on } => on,
+        }
+    }
+
     /// `amount`, due on this schedule, spread evenly over `period`: e.g.
     /// €480 every 12 months is €40 a month. `None` for a one-off line,
     /// which is never smoothed (doc/scope.md).
