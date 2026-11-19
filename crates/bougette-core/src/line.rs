@@ -75,6 +75,8 @@ pub enum LineError {
     NoSuchRevision,
     /// A line keeps at least one revision: remove the line instead.
     OnlyRevision,
+    /// The line has ended by that date.
+    Ended,
 }
 
 impl Line {
@@ -221,6 +223,31 @@ impl Line {
         }
         self.revisions = revisions;
         Ok(())
+    }
+
+    /// Cuts the line in two on `from`, a day after its start: it keeps its
+    /// past and ends the day before, and the part from `from` on is
+    /// returned as a new line (a new identifier, all else the same): the
+    /// amount in force then, from `from`, and the changes after it. Its due
+    /// days stay the same.
+    pub fn split_from(&mut self, from: Date) -> Result<Line, LineError> {
+        if from <= self.starts_on() {
+            return Err(LineError::BeforeStart);
+        }
+        // `.cloned()` turns the `Option<&Revision>` into an owned copy, so
+        // `self` can be changed below while we hold it.
+        let in_force = self.revision_on(from).cloned().ok_or(LineError::Ended)?;
+        let mut rest = self.clone();
+        rest.id = LineId::new();
+        rest.revisions.retain(|revision| revision.from > from);
+        // `..in_force`: the other fields from `in_force`, like a copy with
+        // one member changed.
+        rest.revisions.insert(0, Revision { from, ..in_force });
+        self.revisions.retain(|revision| revision.from < from);
+        // `yesterday` fails only on the first day jiff knows of, and
+        // `from` is after the line's start.
+        self.ends_on = Some(from.yesterday().expect("a day after the start"));
+        Ok(rest)
     }
 
     /// The line stops after `last_day`, or goes on again with `None`.
@@ -434,6 +461,34 @@ mod tests {
             Err(LineError::BeforeStart)
         );
         assert_eq!(line.starts_on(), date(2026, 7, 1));
+    }
+
+    #[test]
+    fn a_line_cut_in_two_keeps_its_past_and_its_due_days() {
+        let mut line = rent(); // 900 from January, due on the 5th
+        line.change_from(date(2026, 4, 1), eur(95000), monthly(date(2026, 1, 5)))
+            .unwrap();
+        line.change_from(date(2026, 9, 1), eur(99000), monthly(date(2026, 1, 5)))
+            .unwrap();
+        let rest = line.split_from(date(2026, 6, 1)).unwrap();
+        // Before June: the line, its two first amounts, ended in May.
+        assert_eq!(line.revisions().len(), 2);
+        assert_eq!(line.ends_on(), Some(date(2026, 5, 31)));
+        assert_eq!(line.amount_in(month(2026, 5), View::Due), eur(95000));
+        assert_eq!(line.amount_in(month(2026, 6), View::Due), eur(0));
+        // From June: a new line, at April's amount, then September's.
+        assert_ne!(rest.id, line.id);
+        assert_eq!(rest.starts_on(), date(2026, 6, 1));
+        assert_eq!(rest.revisions().len(), 2);
+        assert_eq!(rest.amount_in(month(2026, 6), View::Due), eur(95000));
+        assert_eq!(rest.amount_in(month(2026, 10), View::Due), eur(99000));
+        assert_eq!(rest.revisions()[0].schedule.first(), date(2026, 1, 5));
+        // Not on its first day, nor after its end.
+        assert_eq!(
+            line.split_from(date(2026, 1, 1)),
+            Err(LineError::BeforeStart)
+        );
+        assert_eq!(line.split_from(date(2026, 7, 1)), Err(LineError::Ended));
     }
 
     #[test]

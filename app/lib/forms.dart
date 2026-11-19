@@ -186,6 +186,43 @@ Widget repeatChoice(
   );
 }
 
+/// Where a cost's money goes: a pot, another budget, or neither. A record
+/// `(pot, budget)` with at most one set; records compare by value, as a
+/// dropdown needs. `typedef` names a type, like C++'s `using`.
+typedef GoesTo = (PotRow?, BudgetChoice?);
+
+/// A choice of where a cost's money goes: nowhere, one of `pots`, or one
+/// of `destinations` (other budgets).
+Widget goesToChoice(
+  BuildContext context,
+  List<PotRow> pots,
+  List<BudgetChoice> destinations,
+  GoesTo value,
+  void Function(GoesTo) changed,
+) {
+  return DropdownButton<GoesTo>(
+    value: value,
+    isExpanded: true,
+    items: [
+      DropdownMenuItem(
+        value: (null, null),
+        child: Text(context.words.feedsNoPot),
+      ),
+      for (final pot in pots)
+        DropdownMenuItem(
+          value: (pot, null),
+          child: Text(context.words.feedsPot(pot.name)),
+        ),
+      for (final other in destinations)
+        DropdownMenuItem(
+          value: (null, other),
+          child: Text(context.words.toBudget(other.name)),
+        ),
+    ],
+    onChanged: (choice) => changed(choice ?? (null, null)),
+  );
+}
+
 /// The form to add a planned line of the month `view` shows. A cost's
 /// money can go to one of its pots (an allocation) or to one of its
 /// destinations, another budget (a contribution, written there). Returns
@@ -202,10 +239,7 @@ Future<bool> addLine(
   var income = false;
   var repeat = Repeat.monthly;
   var first = DateTime.now();
-  // Where the money goes: a pot, another budget, or neither. A record
-  // `(pot, budget)` with at most one set; records compare by value, as a
-  // dropdown needs.
-  (PotRow?, BudgetChoice?) goesTo = (null, null);
+  GoesTo goesTo = (null, null);
   final goesSomewhere = view.pots.isNotEmpty || view.destinations.isNotEmpty;
   return form(
     context,
@@ -229,28 +263,14 @@ Future<bool> addLine(
         (date) => setState(() => first = date),
       ),
       if (goesSomewhere)
-        DropdownButton<(PotRow?, BudgetChoice?)>(
-          value: goesTo,
-          isExpanded: true,
-          items: [
-            DropdownMenuItem(
-              value: (null, null),
-              child: Text(context.words.feedsNoPot),
-            ),
-            for (final pot in view.pots)
-              DropdownMenuItem(
-                value: (pot, null),
-                child: Text(context.words.feedsPot(pot.name)),
-              ),
-            for (final other in view.destinations)
-              DropdownMenuItem(
-                value: (null, other),
-                child: Text(context.words.toBudget(other.name)),
-              ),
-          ],
+        goesToChoice(
+          context,
+          view.pots,
+          view.destinations,
+          goesTo,
           // Money going somewhere is a cost.
-          onChanged: (value) => setState(() {
-            goesTo = value ?? (null, null);
+          (value) => setState(() {
+            goesTo = value;
             if (goesTo != (null, null)) income = false;
           }),
         ),

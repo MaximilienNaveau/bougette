@@ -119,6 +119,8 @@ pub enum BudgetError {
     UnknownTransaction,
     /// The line still has transactions: remove them first.
     LineInUse,
+    /// The line has transactions from the date it would leave this budget.
+    RealisedFrom,
     /// The line refused the change.
     // A variant can carry data: this one wraps the line's own error.
     Line(LineError),
@@ -149,6 +151,10 @@ impl std::fmt::Display for BudgetError {
             BudgetError::Line(LineError::NoSuchRevision) => "no change of the line on that date",
             BudgetError::Line(LineError::OnlyRevision) => {
                 "a line keeps at least one amount: remove the line instead"
+            }
+            BudgetError::Line(LineError::Ended) => "the line has ended by that date",
+            BudgetError::RealisedFrom => {
+                "the line has transactions from that date: remove them first, or choose a later date"
             }
             BudgetError::PayeeNeedsACost => {
                 "only a cost can be paid to a member, and not by a member"
@@ -349,6 +355,31 @@ impl Budget {
         }
         self.lines.retain(|line| line.id != id);
         Ok(())
+    }
+
+    /// Takes line `id` out of the budget from `from` on, to send its money
+    /// elsewhere (see `Line::split_from`): the part from `from` on is
+    /// returned, and the budget keeps the part before, if any. Refused if
+    /// transactions realise the line from `from` on: they would be left
+    /// on a line that no longer applies.
+    pub fn take_line_from(&mut self, id: LineId, from: Date) -> Result<Line, BudgetError> {
+        let line = self.line(id).ok_or(BudgetError::UnknownLine)?;
+        if from <= line.starts_on() {
+            // All of it goes: the line is removed, and given a new
+            // identifier like a split's second part.
+            let mut whole = line.clone();
+            self.remove_line(id)?;
+            whole.id = LineId::new();
+            return Ok(whole);
+        }
+        if self
+            .transactions
+            .iter()
+            .any(|t| t.line == Some(id) && t.date >= from)
+        {
+            return Err(BudgetError::RealisedFrom);
+        }
+        Ok(self.line_mut(id)?.split_from(from)?)
     }
 
     /// Removes transaction `id`.
@@ -927,6 +958,35 @@ mod tests {
             budget.add_transaction(missing),
             Err(BudgetError::PotMismatch)
         );
+    }
+
+    #[test]
+    fn a_line_leaves_the_budget_from_a_date_keeping_its_past() {
+        // Bike savings, put in the pot from January to April.
+        let (mut budget, bike) = with_bike_pot();
+        let allocation = budget.lines().iter().find(|l| l.pot.is_some()).unwrap().id;
+        // Not from April: April's transfer is on the line.
+        assert_eq!(
+            budget.take_line_from(allocation, date(2026, 4, 1)),
+            Err(BudgetError::RealisedFrom)
+        );
+        // From May: the budget keeps January to April, and the pot what
+        // they put in.
+        let rest = budget.take_line_from(allocation, date(2026, 5, 1)).unwrap();
+        assert_eq!(rest.starts_on(), date(2026, 5, 1));
+        assert_eq!(rest.pot, Some(bike));
+        let kept = budget.line(allocation).unwrap();
+        assert_eq!(kept.ends_on(), Some(date(2026, 4, 30)));
+        assert_eq!(
+            budget.pot_balance(bike, date(2026, 4, 30)),
+            Some(eur(40000))
+        );
+        // From its start, all of it goes, if no transaction is on it.
+        let (mut budget, rent, _) = household();
+        let whole = budget.take_line_from(rent, date(2026, 1, 1)).unwrap();
+        assert_ne!(whole.id, rent);
+        assert_eq!(whole.starts_on(), date(2026, 1, 1));
+        assert_eq!(budget.line(rent), None);
     }
 
     #[test]

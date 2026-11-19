@@ -127,9 +127,13 @@ pub struct LineDetail {
     pub id: String,
     pub name: String,
     pub category: String,
-    /// The other budget holding it, by name, if it's seen in a personal
-    /// budget (a planned contribution): changes go there.
-    pub held_in: Option<String>,
+    /// As seen from the budget asked about.
+    pub income: bool,
+    /// The other budget holding it, if it's seen in a personal budget (a
+    /// planned contribution): changes go there, and so does its money.
+    pub held_in: Option<BudgetChoice>,
+    /// For an allocation, the pot it feeds (its identifier).
+    pub pot: Option<String>,
     pub ends_on: Option<String>,
     /// Oldest first; never empty.
     pub revisions: Vec<RevisionRow>,
@@ -285,39 +289,65 @@ impl App {
         to_budget: Option<String>,
     ) -> Result<String, String> {
         let first = date(&first)?;
-        let schedule = schedule(repeat, first);
         let pot = pot.map(|id| parse_id(&id).map(PotId)).transpose()?;
-        let mut payer = None;
-        // `let target = match ...`: the budget the line is written into.
-        let target = match to_budget {
-            None => budget,
-            Some(other) => {
-                if income || pot.is_some() {
-                    return Err("only a cost, without a pot, goes to another budget".into());
-                }
-                if self.load(&other)?.currency() != self.load(&budget)?.currency() {
-                    return Err("the other budget has another currency".into());
-                }
-                payer = Some(MemberId(self.lock().member().map_err(stored)?));
-                other
-            }
-        };
+        let line = Line::new(
+            name,
+            category,
+            kind(income),
+            first,
+            Money::new(amount, self.load(&budget)?.currency()),
+            schedule(repeat, first),
+        )
+        .map_err(|error| BudgetError::from(error).to_string())?;
+        let (target, line) = self.sent(budget, line, pot, to_budget)?;
         self.edit(&target, |budget| {
-            let mut line = Line::new(
-                name,
-                category,
-                // Seen from the other budget, a contribution comes in.
-                kind(income || payer.is_some()),
-                first,
-                Money::new(amount, budget.currency()),
-                schedule,
-            )
-            .map_err(|error| BudgetError::from(error).to_string())?;
-            line.pot = pot;
-            line.payer = payer;
             let id = budget.add_line(line).map_err(|error| error.to_string())?;
             Ok(id.to_string())
         })
+    }
+
+    /// From `from` (`2026-11-05`) on, the money of cost line `line`, seen
+    /// in `budget`, goes into pot `pot`, or to budget `to_budget`, or
+    /// neither, instead. Before, it went where it did: the line is cut in
+    /// two (see `Budget::take_line_from`), the part from `from` on being a
+    /// new line with the same amounts and due days, written where the
+    /// money now goes, as `add_line` would.
+    pub fn redirect_line(
+        &self,
+        budget: String,
+        line: String,
+        from: String,
+        pot: Option<String>,
+        to_budget: Option<String>,
+    ) -> Result<(), String> {
+        let id = LineId(parse_id(&line)?);
+        let from = date(&from)?;
+        let pot = pot.map(|id| parse_id(&id).map(PotId)).transpose()?;
+        let home = self.line_home(budget.clone(), id)?;
+        let mut held = self.load(&home)?;
+        let line = held.line(id).ok_or(BudgetError::UnknownLine.to_string())?;
+        // Seen from `budget`, a line held there is what it is; one held
+        // elsewhere is a contribution this member pays: a cost.
+        if home == budget && line.kind != Kind::Cost {
+            return Err("only a cost's money goes into a pot or another budget".into());
+        }
+        let mut rest = held
+            .take_line_from(id, from)
+            .map_err(|error| error.to_string())?;
+        // A cost as seen from `budget`, where it now leaves from.
+        rest.kind = Kind::Cost;
+        let (target, rest) = self.sent(budget, rest, pot, to_budget)?;
+        // Every check done in memory first, then saved: the budget it goes
+        // to, and the one it leaves (they may be the same).
+        if target == home {
+            held.add_line(rest).map_err(|error| error.to_string())?;
+        } else {
+            let mut there = self.load(&target)?;
+            there.add_line(rest).map_err(|error| error.to_string())?;
+            self.lock().save(&there).map_err(stored)?;
+        }
+        self.lock().save(&held).map_err(stored)?;
+        Ok(())
     }
 
     /// Adds a transaction of `amount` cents on `date`, realising the line
@@ -416,7 +446,10 @@ impl App {
         let holder = self.holder_of_line(&budget, id)?;
         // `as_ref` borrows the Budget inside the Option, so `holder` can
         // still be moved into `budget` below.
-        let held_in = holder.as_ref().map(|holder| holder.name.clone());
+        let held_in = holder.as_ref().map(|holder| BudgetChoice {
+            id: holder.id.to_string(),
+            name: holder.name.clone(),
+        });
         let budget = match holder {
             Some(holder) => holder,
             None => self.load(&budget)?,
@@ -428,7 +461,10 @@ impl App {
             id: line.id.to_string(),
             name: line.name.clone(),
             category: line.category.clone(),
+            // Held elsewhere, it's this member's contribution: a cost.
+            income: held_in.is_none() && line.kind == Kind::Income,
             held_in,
+            pot: line.pot.map(|pot| pot.to_string()),
             ends_on: line.ends_on().map(|day| day.to_string()),
             revisions: line
                 .revisions()
@@ -778,6 +814,38 @@ impl App {
             }
         }
         Ok(choices)
+    }
+
+    /// Where `line`, a line of `budget` (a cost if it goes somewhere), is
+    /// written: in `budget`, feeding pot `pot` if given; or, for a cost
+    /// going to budget `to_budget`, there, as this member's planned
+    /// contribution: an income they pay, shown here as a cost (see
+    /// `MonthView::destinations`). Returns that budget and the line as
+    /// written there.
+    fn sent(
+        &self,
+        budget: String,
+        mut line: Line,
+        pot: Option<PotId>,
+        to_budget: Option<String>,
+    ) -> Result<(String, Line), String> {
+        line.pot = pot;
+        line.payer = None;
+        // `let ... else`: the else block runs when the pattern doesn't
+        // match (here, no other budget), and must leave the function.
+        let Some(other) = to_budget else {
+            return Ok((budget, line));
+        };
+        if line.kind != Kind::Cost || pot.is_some() {
+            return Err("only a cost, without a pot, goes to another budget".into());
+        }
+        if self.load(&other)?.currency() != self.load(&budget)?.currency() {
+            return Err("the other budget has another currency".into());
+        }
+        // Seen from the other budget, a contribution comes in.
+        line.kind = Kind::Income;
+        line.payer = Some(MemberId(self.lock().member().map_err(stored)?));
+        Ok((other, line))
     }
 
     /// The other budget holding line `id`, if `budget` shows it without
@@ -1211,6 +1279,121 @@ mod tests {
                 None,
                 Some(flat),
             )
+            .unwrap_err();
+        assert!(refused.contains("only a cost"), "{refused}");
+    }
+
+    #[test]
+    fn a_line_is_redirected_from_a_date_keeping_its_past() {
+        let app = app();
+        let today = day(2026, 11, 16);
+        let home = app.create_budget("Home".into(), "EUR".into()).unwrap();
+        app.set_personal(home.clone(), true).unwrap();
+        let flat = app.create_budget("Flat".into(), "EUR".into()).unwrap();
+        let savings = app
+            .add_pot(home.clone(), "Savings".into(), None, None)
+            .unwrap();
+        // 100 a month to the flat since January, paid in November.
+        let line = app
+            .add_line(
+                home.clone(),
+                "Flat".into(),
+                "Contributions".into(),
+                false,
+                10000,
+                Repeat::Monthly,
+                "2026-01-01".into(),
+                None,
+                Some(flat.clone()),
+            )
+            .unwrap();
+        app.add_transaction(
+            home.clone(),
+            "2026-11-01".into(),
+            false,
+            10000,
+            "Flat".into(),
+            Some(line.clone()),
+            String::new(),
+            None,
+            false,
+        )
+        .unwrap();
+        let lines = |budget: &str, month: &str| app.month_on(budget, month, today).unwrap().lines;
+
+        // Not from November: its transfer is on the line.
+        let refused = app
+            .redirect_line(
+                home.clone(),
+                line.clone(),
+                "2026-11-01".into(),
+                Some(savings.clone()),
+                None,
+            )
+            .unwrap_err();
+        assert!(refused.contains("choose a later date"), "{refused}");
+
+        // From December, into the savings pot instead.
+        app.redirect_line(
+            home.clone(),
+            line.clone(),
+            "2026-12-01".into(),
+            Some(savings.clone()),
+            None,
+        )
+        .unwrap();
+        // The flat keeps November, paid; nothing from December.
+        assert_eq!(lines(&flat, "2026-11")[0].actual, 10000);
+        assert!(lines(&flat, "2026-12").is_empty());
+        // Home pays the pot from December, with a line of its own.
+        let december = lines(&home, "2026-12");
+        assert_eq!(december.len(), 1);
+        let saved = &december[0];
+        assert_eq!(saved.pot.as_ref(), Some(&savings));
+        assert!(!saved.reflected && !saved.income);
+        assert_eq!(
+            (saved.due, saved.category.as_str()),
+            (10000, "Contributions")
+        );
+
+        // And to the flat again from March.
+        app.redirect_line(
+            home.clone(),
+            saved.id.clone(),
+            "2027-03-01".into(),
+            None,
+            Some(flat.clone()),
+        )
+        .unwrap();
+        assert_eq!(lines(&home, "2027-02")[0].pot.as_ref(), Some(&savings));
+        let march = lines(&flat, "2027-03");
+        assert!(march[0].income && march[0].due == 10000);
+        let seen = &lines(&home, "2027-03")[0];
+        assert!(seen.reflected);
+        // In full, from home: a cost, held by the flat.
+        let detail = app.line_detail(home.clone(), seen.id.clone()).unwrap();
+        assert!(!detail.income && detail.pot.is_none());
+        assert_eq!(
+            detail.held_in.map(|held| held.name).as_deref(),
+            Some("Flat")
+        );
+
+        // An income's money doesn't go anywhere.
+        let salary = app
+            .add_line(
+                home.clone(),
+                "Salary".into(),
+                "Work".into(),
+                true,
+                300000,
+                Repeat::Monthly,
+                "2026-01-30".into(),
+                None,
+                None,
+            )
+            .unwrap();
+        let refused = app
+            .redirect_line(home, salary, "2026-12-01".into(), Some(savings), None)
             .unwrap_err();
         assert!(refused.contains("only a cost"), "{refused}");
     }

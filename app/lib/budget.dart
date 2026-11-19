@@ -82,15 +82,18 @@ class _BudgetScreenState extends State<BudgetScreen> {
     if (await changed) _reload();
   }
 
-  /// Opens a line in full, and reloads when back from it.
-  Future<void> _openLine(LineRow line, String currency) async {
+  /// Opens a line of the month `view` shows in full, and reloads when
+  /// back from it.
+  Future<void> _openLine(LineRow line, MonthView view) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => LineScreen(
           app: widget.app,
           budget: _budget,
           line: line.id,
-          currency: currency,
+          currency: view.currency,
+          pots: view.pots,
+          destinations: view.destinations,
         ),
       ),
     );
@@ -210,7 +213,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
                     ? const Center(child: CircularProgressIndicator())
                     : MonthBody(
                         view: view,
-                        onLine: (line) => _openLine(line, currency),
+                        onLine: (line) => _openLine(line, view),
                         onTransaction: (transaction) => _then(
                           removeTransaction(context, app, _budget, transaction),
                         ),

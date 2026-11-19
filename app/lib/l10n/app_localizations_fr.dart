@@ -430,4 +430,10 @@ class AppLocalizationsFr extends AppLocalizations {
   String heldIn(String budget) {
     return 'Ce poste appartient au budget $budget : les modifications y sont faites.';
   }
+
+  @override
+  String get whereItGoes => 'Où va son argent';
+
+  @override
+  String get redirect => 'L\'envoyer ailleurs à partir d\'une date…';
 }

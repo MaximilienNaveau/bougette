@@ -125,5 +125,7 @@
   "asBefore": "Comme avant",
   "removeAmount": "Supprimer ce changement",
   "removeAmountQuestion": "Supprimer ce changement ? Le montant précédent continue.",
-  "heldIn": "Ce poste appartient au budget {budget} : les modifications y sont faites."
+  "heldIn": "Ce poste appartient au budget {budget} : les modifications y sont faites.",
+  "whereItGoes": "Où va son argent",
+  "redirect": "L'envoyer ailleurs à partir d'une date…"
 }

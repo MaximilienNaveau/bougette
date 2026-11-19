@@ -40,7 +40,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 21788536;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -637241801;
 
 // Section: executor
 
@@ -1221,6 +1221,67 @@ fn wire__crate__api__App_recover_impl(
         },
     )
 }
+fn wire__crate__api__App_redirect_line_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "App_redirect_line",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<App>,
+            >>::sse_decode(&mut deserializer);
+            let api_budget = <String>::sse_decode(&mut deserializer);
+            let api_line = <String>::sse_decode(&mut deserializer);
+            let api_from = <String>::sse_decode(&mut deserializer);
+            let api_pot = <Option<String>>::sse_decode(&mut deserializer);
+            let api_to_budget = <Option<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let mut api_that_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_that, 0, false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_that_guard = api_that_guard.unwrap();
+                    let output_ok = crate::api::App::redirect_line(
+                        &*api_that_guard,
+                        api_budget,
+                        api_line,
+                        api_from,
+                        api_pot,
+                        api_to_budget,
+                    )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__App_remove_line_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -2017,14 +2078,18 @@ impl SseDecode for crate::api::LineDetail {
         let mut var_id = <String>::sse_decode(deserializer);
         let mut var_name = <String>::sse_decode(deserializer);
         let mut var_category = <String>::sse_decode(deserializer);
-        let mut var_heldIn = <Option<String>>::sse_decode(deserializer);
+        let mut var_income = <bool>::sse_decode(deserializer);
+        let mut var_heldIn = <Option<crate::api::BudgetChoice>>::sse_decode(deserializer);
+        let mut var_pot = <Option<String>>::sse_decode(deserializer);
         let mut var_endsOn = <Option<String>>::sse_decode(deserializer);
         let mut var_revisions = <Vec<crate::api::RevisionRow>>::sse_decode(deserializer);
         return crate::api::LineDetail {
             id: var_id,
             name: var_name,
             category: var_category,
+            income: var_income,
             held_in: var_heldIn,
+            pot: var_pot,
             ends_on: var_endsOn,
             revisions: var_revisions,
         };
@@ -2269,6 +2334,17 @@ impl SseDecode for Option<String> {
     }
 }
 
+impl SseDecode for Option<crate::api::BudgetChoice> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::BudgetChoice>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for Option<i64> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -2506,19 +2582,20 @@ fn pde_ffi_dispatcher_primary_impl(
         20 => wire__crate__api__App_name_impl(port, ptr, rust_vec_len, data_len),
         21 => wire__crate__api__App_open_impl(port, ptr, rust_vec_len, data_len),
         22 => wire__crate__api__App_recover_impl(port, ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__App_remove_line_impl(port, ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__App_remove_member_impl(port, ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__App_remove_revision_impl(port, ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__App_remove_transaction_impl(port, ptr, rust_vec_len, data_len),
-        27 => wire__crate__api__App_rename_budget_impl(port, ptr, rust_vec_len, data_len),
-        28 => wire__crate__api__App_rename_line_impl(port, ptr, rust_vec_len, data_len),
-        29 => wire__crate__api__App_server_impl(port, ptr, rust_vec_len, data_len),
-        30 => wire__crate__api__App_set_name_impl(port, ptr, rust_vec_len, data_len),
-        31 => wire__crate__api__App_set_personal_impl(port, ptr, rust_vec_len, data_len),
-        32 => wire__crate__api__App_set_revision_impl(port, ptr, rust_vec_len, data_len),
-        33 => wire__crate__api__App_set_role_impl(port, ptr, rust_vec_len, data_len),
-        34 => wire__crate__api__App_set_up_recovery_impl(port, ptr, rust_vec_len, data_len),
-        35 => wire__crate__api__App_sync_now_impl(port, ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__App_redirect_line_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__App_remove_line_impl(port, ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__App_remove_member_impl(port, ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__App_remove_revision_impl(port, ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__App_remove_transaction_impl(port, ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__App_rename_budget_impl(port, ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__App_rename_line_impl(port, ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__App_server_impl(port, ptr, rust_vec_len, data_len),
+        31 => wire__crate__api__App_set_name_impl(port, ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__App_set_personal_impl(port, ptr, rust_vec_len, data_len),
+        33 => wire__crate__api__App_set_revision_impl(port, ptr, rust_vec_len, data_len),
+        34 => wire__crate__api__App_set_role_impl(port, ptr, rust_vec_len, data_len),
+        35 => wire__crate__api__App_set_up_recovery_impl(port, ptr, rust_vec_len, data_len),
+        36 => wire__crate__api__App_sync_now_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2595,7 +2672,9 @@ impl flutter_rust_bridge::IntoDart for crate::api::LineDetail {
             self.id.into_into_dart().into_dart(),
             self.name.into_into_dart().into_dart(),
             self.category.into_into_dart().into_dart(),
+            self.income.into_into_dart().into_dart(),
             self.held_in.into_into_dart().into_dart(),
+            self.pot.into_into_dart().into_dart(),
             self.ends_on.into_into_dart().into_dart(),
             self.revisions.into_into_dart().into_dart(),
         ]
@@ -2980,7 +3059,9 @@ impl SseEncode for crate::api::LineDetail {
         <String>::sse_encode(self.id, serializer);
         <String>::sse_encode(self.name, serializer);
         <String>::sse_encode(self.category, serializer);
-        <Option<String>>::sse_encode(self.held_in, serializer);
+        <bool>::sse_encode(self.income, serializer);
+        <Option<crate::api::BudgetChoice>>::sse_encode(self.held_in, serializer);
+        <Option<String>>::sse_encode(self.pot, serializer);
         <Option<String>>::sse_encode(self.ends_on, serializer);
         <Vec<crate::api::RevisionRow>>::sse_encode(self.revisions, serializer);
     }
@@ -3160,6 +3241,16 @@ impl SseEncode for Option<String> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <String>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::api::BudgetChoice> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::BudgetChoice>::sse_encode(value, serializer);
         }
     }
 }

@@ -853,6 +853,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This line belongs to the {budget} budget: changes are made there.'**
   String heldIn(String budget);
+
+  /// No description provided for @whereItGoes.
+  ///
+  /// In en, this message translates to:
+  /// **'Where its money goes'**
+  String get whereItGoes;
+
+  /// No description provided for @redirect.
+  ///
+  /// In en, this message translates to:
+  /// **'Send it elsewhere from a date…'**
+  String get redirect;
 }
 
 class _AppLocalizationsDelegate

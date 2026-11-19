@@ -158,6 +158,32 @@ void main() {
     await settle(tester);
     expect(find.text('Appart (Apport)'), findsOneWidget);
     expect(find.byTooltip('from another budget'), findsNothing);
+
+    // From the personal budget again, redirected from today (its start):
+    // all of it stays home, as a plain cost.
+    await tester.pageBack();
+    await settle(tester);
+    await tester.tap(find.text('Maison'));
+    await settle(tester);
+    await tester.tap(find.text('Appart (Appartement)'));
+    await settle(tester);
+    await tester.tap(find.text('Goes to the Appartement budget'));
+    await settle(tester);
+    // The form's choice, drawn over the screen's tile: the last one.
+    await tester.tap(find.text('Goes to the Appartement budget').last);
+    await settle(tester);
+    await tester.tap(find.text('Feeds no pot').last);
+    await settle(tester);
+    await tester.tap(find.text('OK'));
+    await settle(tester);
+    // Back on the month: home's own line now, in the category typed.
+    expect(find.text('Appart (Apport)'), findsOneWidget);
+    expect(find.byTooltip('from another budget'), findsNothing);
+    await tester.pageBack();
+    await settle(tester);
+    await tester.tap(find.text('Appartement'));
+    await settle(tester);
+    expect(find.text('Appart (Apport)'), findsNothing);
   });
 
   testWidgets('in French', (tester) async {

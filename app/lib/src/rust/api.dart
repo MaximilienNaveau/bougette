@@ -8,7 +8,7 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `budgets_on`, `calendar_on`, `change`, `date`, `destinations`, `edit`, `holder_of_line`, `kind`, `line_home`, `load`, `lock`, `month_on`, `month_text`, `parse_id`, `parse_month`, `repeat_of`, `schedule`, `shown`, `source`, `status`, `stored`, `today`, `totals`, `with`
+// These functions are ignored because they are not marked as `pub`: `budgets_on`, `calendar_on`, `change`, `date`, `destinations`, `edit`, `holder_of_line`, `kind`, `line_home`, `load`, `lock`, `month_on`, `month_text`, `parse_id`, `parse_month`, `repeat_of`, `schedule`, `sent`, `shown`, `source`, `status`, `stored`, `today`, `totals`, `with`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<App>>
@@ -140,6 +140,20 @@ abstract class App implements RustOpaqueInterface {
     required String token,
     required String username,
     required String phrase,
+  });
+
+  /// From `from` (`2026-11-05`) on, the money of cost line `line`, seen
+  /// in `budget`, goes into pot `pot`, or to budget `to_budget`, or
+  /// neither, instead. Before, it went where it did: the line is cut in
+  /// two (see `Budget::take_line_from`), the part from `from` on being a
+  /// new line with the same amounts and due days, written where the
+  /// money now goes, as `add_line` would.
+  Future<void> redirectLine({
+    required String budget,
+    required String line,
+    required String from,
+    String? pot,
+    String? toBudget,
   });
 
   /// Removes line `line`, refused while transactions realise it.
@@ -285,9 +299,15 @@ class LineDetail {
   final String name;
   final String category;
 
-  /// The other budget holding it, by name, if it's seen in a personal
-  /// budget (a planned contribution): changes go there.
-  final String? heldIn;
+  /// As seen from the budget asked about.
+  final bool income;
+
+  /// The other budget holding it, if it's seen in a personal budget (a
+  /// planned contribution): changes go there, and so does its money.
+  final BudgetChoice? heldIn;
+
+  /// For an allocation, the pot it feeds (its identifier).
+  final String? pot;
   final String? endsOn;
 
   /// Oldest first; never empty.
@@ -297,7 +317,9 @@ class LineDetail {
     required this.id,
     required this.name,
     required this.category,
+    required this.income,
     this.heldIn,
+    this.pot,
     this.endsOn,
     required this.revisions,
   });
@@ -307,7 +329,9 @@ class LineDetail {
       id.hashCode ^
       name.hashCode ^
       category.hashCode ^
+      income.hashCode ^
       heldIn.hashCode ^
+      pot.hashCode ^
       endsOn.hashCode ^
       revisions.hashCode;
 
@@ -319,7 +343,9 @@ class LineDetail {
           id == other.id &&
           name == other.name &&
           category == other.category &&
+          income == other.income &&
           heldIn == other.heldIn &&
+          pot == other.pot &&
           endsOn == other.endsOn &&
           revisions == other.revisions;
 }

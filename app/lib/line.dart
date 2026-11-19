@@ -1,6 +1,7 @@
-// A line, in full: its name and category, its amounts over time as a
-// table (the start, then each change), its end, and its removal. Every
-// change is made by the Rust core, which keeps the line's due days.
+// A line, in full: its name and category, where a cost's money goes, its
+// amounts over time as a table (the start, then each change), its end, and
+// its removal. Every change is made by the Rust core, which keeps the
+// line's due days.
 
 import 'package:flutter/material.dart';
 
@@ -15,12 +16,18 @@ class LineScreen extends StatefulWidget {
     required this.budget,
     required this.line,
     required this.currency,
+    required this.pots,
+    required this.destinations,
   });
 
   final App app;
   final String budget;
   final String line;
   final String currency;
+  // Where a cost's money can go: the budget's pots and the other budgets
+  // (see `MonthView`).
+  final List<PotRow> pots;
+  final List<BudgetChoice> destinations;
 
   @override
   State<LineScreen> createState() => _LineScreenState();
@@ -119,6 +126,58 @@ class _LineScreenState extends State<LineScreen> {
         );
       },
     );
+  }
+
+  /// Where the money of `line`, a cost, goes now.
+  GoesTo _goesTo(LineDetail line) => (
+    widget.pots.where((pot) => pot.id == line.pot).firstOrNull,
+    widget.destinations
+        .where((other) => other.id == line.heldIn?.id)
+        .firstOrNull,
+  );
+
+  String _goesToText(GoesTo goesTo) => switch (goesTo) {
+    // Patterns on the record: `(final pot?, _)` matches a non-null pot.
+    (final pot?, _) => context.words.feedsPot(pot.name),
+    (_, final other?) => context.words.toBudget(other.name),
+    _ => context.words.feedsNoPot,
+  };
+
+  /// The form to send `line`'s money elsewhere from a date. The line is
+  /// cut in two there (by the core), so this screen closes after it.
+  Future<void> _redirect(LineDetail line) async {
+    var from = DateTime.now();
+    var goesTo = _goesTo(line);
+    final done = await form(
+      context,
+      context.words.whereItGoes,
+      (setState) => [
+        dateButton(
+          context,
+          context.words.from,
+          from,
+          (date) => setState(() => from = date),
+        ),
+        goesToChoice(
+          context,
+          widget.pots,
+          widget.destinations,
+          goesTo,
+          (value) => setState(() => goesTo = value),
+        ),
+      ],
+      (context) => guard(
+        context,
+        () => _app.redirectLine(
+          budget: widget.budget,
+          line: widget.line,
+          from: day(from),
+          pot: goesTo.$1?.id,
+          toBudget: goesTo.$2?.id,
+        ),
+      ),
+    );
+    if (done && mounted) Navigator.of(context).pop();
   }
 
   Future<bool> _removeAmount(RevisionRow row) async {
@@ -222,7 +281,7 @@ class _LineScreenState extends State<LineScreen> {
         if (line.heldIn != null)
           ListTile(
             leading: const Icon(Icons.link),
-            title: Text(words.heldIn(line.heldIn!)),
+            title: Text(words.heldIn(line.heldIn!.name)),
           ),
         ListTile(
           leading: const Icon(Icons.edit),
@@ -230,6 +289,15 @@ class _LineScreenState extends State<LineScreen> {
           subtitle: Text('${words.name}, ${words.category}'),
           onTap: () => _then(_rename(line)),
         ),
+        // An income's money goes nowhere else.
+        if (!line.income &&
+            (widget.pots.isNotEmpty || widget.destinations.isNotEmpty))
+          ListTile(
+            leading: const Icon(Icons.alt_route),
+            title: Text(_goesToText(_goesTo(line))),
+            subtitle: Text(words.redirect),
+            onTap: () => _redirect(line),
+          ),
         const SizedBox(height: 16),
         Text(words.amounts, style: heading),
         DataTable(
