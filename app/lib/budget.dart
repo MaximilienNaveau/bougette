@@ -1,8 +1,9 @@
-// A budget, in one screen: its year's calendar as a strip of months at
-// the top (doc/scope.md: the current year by default, scrolling without
+// A budget, in one screen: its year's twelve months at the top
+// (doc/scope.md: the current year by default, moving year by year without
 // limit, each month coloured by where its figures come from and by any
-// overspending), and below it the selected month's lines, totals,
-// transactions and pots, ready to edit. It opens on the current month.
+// overspending), in rows that fit the window, and below it the selected
+// month's lines, totals, transactions and pots, ready to edit. It opens on
+// the current month.
 
 import 'package:flutter/material.dart';
 
@@ -25,6 +26,12 @@ class BudgetScreen extends StatefulWidget {
 
 /// The width of a month in the strip, its gap included.
 const double _tileWidth = 128;
+
+/// The narrowest a month can be in a row of months.
+const double _minTileWidth = 104;
+
+/// The height of the strip of months, its padding included.
+const double _tileHeight = 132;
 
 class _BudgetScreenState extends State<BudgetScreen> {
   final DateTime _now = DateTime.now();
@@ -203,7 +210,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
                 ),
           body: Column(
             children: [
-              SizedBox(height: 148, child: _strip(currency)),
+              _strip(currency),
               const Divider(height: 1),
               // `Expanded`: the month takes the rest of the height.
               Expanded(
@@ -227,35 +234,81 @@ class _BudgetScreenState extends State<BudgetScreen> {
     );
   }
 
-  /// The twelve months of the year, side by side.
+  /// The twelve months of the year, all in view: in one row, or in rows
+  /// of 6 or 4 if the window is narrower. On a phone, where even 4 don't
+  /// fit, a strip to swipe.
   Widget _strip(String currency) {
     return FutureBuilder(
       future: _months,
       builder: (context, snapshot) {
         final months = snapshot.data;
         if (months == null) {
-          return Center(
-            child: Text(snapshot.hasError ? '${snapshot.error}' : ''),
+          return SizedBox(
+            height: _tileHeight,
+            child: Center(
+              child: Text(snapshot.hasError ? '${snapshot.error}' : ''),
+            ),
           );
         }
-        return ListView(
-          controller: _scroll,
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.all(8),
-          children: [
-            // `indexed` gives (position, item) pairs, like Python's
-            // enumerate.
-            for (final (index, cell) in months.indexed)
-              SizedBox(
-                width: _tileWidth,
-                child: _MonthTile(
-                  cell: cell,
-                  currency: currency,
-                  selected: index + 1 == _month,
-                  onTap: () => _select(index + 1),
+        // `indexed` gives (position, item) pairs, like Python's enumerate.
+        final tiles = [
+          for (final (index, cell) in months.indexed)
+            _MonthTile(
+              cell: cell,
+              currency: currency,
+              selected: index + 1 == _month,
+              onTap: () => _select(index + 1),
+            ),
+        ];
+        // `LayoutBuilder` gives the width available, like a resize event.
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth - 16; // the padding
+            // The most months per row that divides the year evenly and
+            // leaves each tile wide enough. `firstWhere` with `orElse`:
+            // `std::find_if`, with a default when nothing matches.
+            final perRow = const [
+              12,
+              6,
+              4,
+            ].firstWhere((n) => width / n >= _minTileWidth, orElse: () => 0);
+            if (perRow == 0) {
+              return SizedBox(
+                height: _tileHeight,
+                child: ListView(
+                  controller: _scroll,
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.all(8),
+                  children: [
+                    for (final tile in tiles)
+                      SizedBox(width: _tileWidth, child: tile),
+                  ],
                 ),
+              );
+            }
+            return Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                children: [
+                  // Rows of `perRow` tiles, each tile an equal share of
+                  // the width (`Expanded`).
+                  for (var start = 0; start < 12; start += perRow)
+                    SizedBox(
+                      height: _tileHeight - 16,
+                      child: Row(
+                        children: [
+                          for (final tile in tiles.sublist(
+                            start,
+                            start + perRow,
+                          ))
+                            Expanded(child: tile),
+                        ],
+                      ),
+                    ),
+                ],
               ),
-          ],
+            );
+          },
         );
       },
     );

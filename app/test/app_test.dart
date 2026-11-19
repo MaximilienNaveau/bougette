@@ -115,6 +115,29 @@ void main() {
     expect(find.text('Loyer (Logement)'), findsNothing);
   });
 
+  testWidgets('a narrow window shows the whole year', (tester) async {
+    final app = (await tester.runAsync(() async {
+      final folder = Directory.systemTemp.createTempSync('bougette-test');
+      final app = await App.open(path: '${folder.path}/test.sqlite');
+      await app.createBudget(name: 'Maison', currency: 'EUR');
+      return app;
+    }))!;
+    // Two rows of 6, then three rows of 4: every month can be tapped.
+    for (final width in [800.0, 500.0]) {
+      tester.view.physicalSize = Size(width, 1000);
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpWidget(BougetteApp(app: app));
+      await settle(tester);
+      await tester.tap(find.text('Maison'));
+      await settle(tester);
+      for (final month in ['January', 'June', 'December']) {
+        expect(find.text(month).hitTestable(), findsOneWidget, reason: month);
+      }
+      await tester.pageBack();
+      await settle(tester);
+    }
+  });
+
   testWidgets('a line going to another budget shows in both', (tester) async {
     tester.view.physicalSize = const Size(1600, 1200);
     tester.view.devicePixelRatio = 1;
