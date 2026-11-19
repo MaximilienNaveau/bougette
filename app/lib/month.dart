@@ -1,33 +1,12 @@
 // The detail of one month of a budget, shown under the calendar strip
 // (budget.dart): each line planned and actual, the transactions, the
-// totals, the running balance and the pots. Tapping a line or a
-// transaction offers what can be done to it.
+// totals, the running balance and the pots. Tapping a line opens it in
+// full, tapping a transaction opens it to change or remove.
 
 import 'package:flutter/material.dart';
 
-import 'forms.dart';
 import 'look.dart';
 import 'src/rust/api.dart';
-
-/// Asks, then removes a transaction. A reflection is removed from the
-/// budget it comes from (its category is that budget's name).
-Future<bool> removeTransaction(
-  BuildContext context,
-  App app,
-  String budget,
-  TransactionRow transaction,
-) async {
-  final question = transaction.reflected
-      ? context.words.removeThereToo(transaction.category)
-      : context.words.removeTransactionQuestion;
-  if (!await confirm(context, question) || !context.mounted) {
-    return false;
-  }
-  return guard(
-    context,
-    () => app.removeTransaction(budget: budget, transaction: transaction.id),
-  );
-}
 
 class MonthBody extends StatelessWidget {
   const MonthBody({

@@ -115,6 +115,51 @@ void main() {
     expect(find.text('Loyer (Logement)'), findsNothing);
   });
 
+  testWidgets('a transaction is changed, then removed', (tester) async {
+    tester.view.physicalSize = const Size(1600, 1200);
+    tester.view.devicePixelRatio = 1;
+    final now = DateTime.now();
+    final today =
+        '${now.year}-${'${now.month}'.padLeft(2, '0')}-${'${now.day}'.padLeft(2, '0')}';
+    final app = (await tester.runAsync(() async {
+      final folder = Directory.systemTemp.createTempSync('bougette-test');
+      final app = await App.open(path: '${folder.path}/test.sqlite');
+      final id = await app.createBudget(name: 'Maison', currency: 'EUR');
+      await app.addTransaction(
+        budget: id,
+        dateText: today,
+        income: false,
+        amount: 4200,
+        category: 'Courses',
+        note: 'marché',
+        fromPot: false,
+      );
+      return app;
+    }))!;
+    await tester.pumpWidget(BougetteApp(app: app));
+    await settle(tester);
+    await tester.tap(find.text('Maison'));
+    await settle(tester);
+
+    // Opened with what it holds; 42 becomes 45.
+    await tester.tap(find.text('Courses · marché'));
+    await settle(tester);
+    expect(find.text('Change the transaction'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextField, '42.00'), '45');
+    await tester.tap(find.text('OK'));
+    await settle(tester);
+    expect(find.text('-€45.00'), findsWidgets);
+
+    // Opened again, removed.
+    await tester.tap(find.text('Courses · marché'));
+    await settle(tester);
+    await tester.tap(find.text('Remove it'));
+    await settle(tester);
+    await tester.tap(find.text('Yes'));
+    await settle(tester);
+    expect(find.text('Courses · marché'), findsNothing);
+  });
+
   testWidgets('a narrow window shows the whole year', (tester) async {
     final app = (await tester.runAsync(() async {
       final folder = Directory.systemTemp.createTempSync('bougette-test');

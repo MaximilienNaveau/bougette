@@ -47,6 +47,7 @@
   "by": "D'ici le",
   "newLine": "Nouveau poste",
   "newTransaction": "Nouvelle opération",
+  "changeTransaction": "Modifier l'opération",
   "newPot": "Nouvelle cagnotte",
   "feedsNoPot": "N'alimente aucune cagnotte",
   "feedsPot": "Alimente {pot}",

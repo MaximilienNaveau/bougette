@@ -298,57 +298,76 @@ Future<bool> addLine(
 }
 
 /// The form to add a transaction, possibly realising one of the month's
-/// lines, or moving money into or out of a pot. Returns whether one was
-/// added.
+/// lines, or moving money into or out of a pot; or, given `existing`, to
+/// change that one, with a button to remove it instead. One held by
+/// another budget (`reflected`) only changes in date, amount and note.
+/// Returns whether something changed.
 Future<bool> addTransaction(
   BuildContext context,
   App app,
   String budget,
-  MonthView view,
-) {
-  final amount = TextEditingController();
-  final category = TextEditingController();
-  final note = TextEditingController();
-  var income = false;
-  LineRow? line;
+  MonthView view, {
+  TransactionRow? existing,
+}) async {
+  final amount = TextEditingController(
+    text: existing == null ? '' : centsText(existing.amount),
+  );
+  final category = TextEditingController(text: existing?.category ?? '');
+  final note = TextEditingController(text: existing?.note ?? '');
+  var income = existing?.income ?? false;
+  // The line, by identifier: a transaction's line may not be one of this
+  // month's (paid early, say), and must not be lost by editing it.
+  String? lineId = existing?.lineId;
   // The pot, and whether the money comes from it (else goes into it).
-  PotRow? pot;
-  var fromPot = false;
-  var date = DateTime.now();
-  return form(
+  PotRow? pot = view.pots.where((p) => p.id == existing?.pot).firstOrNull;
+  var fromPot = existing?.fromPot ?? false;
+  var date = existing == null ? DateTime.now() : DateTime.parse(existing.date);
+  final all = existing == null || !existing.reflected;
+  var remove = false;
+  final changed = await form(
     context,
-    context.words.newTransaction,
+    existing == null
+        ? context.words.newTransaction
+        : context.words.changeTransaction,
     (setState) => [
-      DropdownButton<LineRow?>(
-        value: line,
-        isExpanded: true,
-        items: [
-          DropdownMenuItem(value: null, child: Text(context.words.unplanned)),
-          for (final option in view.lines)
-            DropdownMenuItem(value: option, child: Text(option.name)),
-        ],
-        // Choosing a line fills in its kind, category and pot.
-        onChanged: (value) => setState(() {
-          line = value;
-          if (value != null) {
-            income = value.income;
-            category.text = value.category;
-            pot = view.pots.where((p) => p.id == value.pot).firstOrNull;
-            fromPot = false;
-          }
-        }),
-      ),
+      if (all)
+        DropdownButton<String?>(
+          value: lineId,
+          isExpanded: true,
+          items: [
+            DropdownMenuItem(value: null, child: Text(context.words.unplanned)),
+            for (final option in view.lines)
+              DropdownMenuItem(value: option.id, child: Text(option.name)),
+            if (lineId != null && !view.lines.any((l) => l.id == lineId))
+              DropdownMenuItem(
+                value: lineId,
+                child: Text(existing?.line ?? '?'),
+              ),
+          ],
+          // Choosing a line fills in its kind, category and pot.
+          onChanged: (value) => setState(() {
+            lineId = value;
+            final chosen = view.lines.where((l) => l.id == value).firstOrNull;
+            if (chosen != null) {
+              income = chosen.income;
+              category.text = chosen.category;
+              pot = view.pots.where((p) => p.id == chosen.pot).firstOrNull;
+              fromPot = false;
+            }
+          }),
+        ),
       field(amount, context.words.amount),
-      field(category, context.words.category),
+      if (all) field(category, context.words.category),
       field(note, context.words.note),
-      SwitchListTile(
-        title: Text(context.words.income),
-        value: income,
-        onChanged: line == null && pot == null
-            ? (value) => setState(() => income = value)
-            : null,
-      ),
-      if (view.pots.isNotEmpty)
+      if (all)
+        SwitchListTile(
+          title: Text(context.words.income),
+          value: income,
+          onChanged: lineId == null && pot == null
+              ? (value) => setState(() => income = value)
+              : null,
+        ),
+      if (all && view.pots.isNotEmpty)
         DropdownButton<(PotRow, bool)?>(
           // A record `(pot, from)`: one choice per pot and direction.
           value: pot == null ? null : (pot!, fromPot),
@@ -378,25 +397,75 @@ Future<bool> addTransaction(
         date,
         (picked) => setState(() => date = picked),
       ),
+      if (existing != null)
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            icon: const Icon(Icons.delete_outline),
+            label: Text(context.words.removeIt),
+            // Closes the form; the removal is asked for below.
+            onPressed: () {
+              remove = true;
+              Navigator.of(context).pop(false);
+            },
+          ),
+        ),
     ],
     (context) async {
       final value = cents(amount.text);
       if (value == null) return false;
       return guard(
         context,
-        () => app.addTransaction(
-          budget: budget,
-          dateText: day(date),
-          income: income,
-          amount: value,
-          category: category.text,
-          line: line?.id,
-          note: note.text,
-          pot: pot?.id,
-          fromPot: fromPot,
-        ),
+        () => existing == null
+            ? app.addTransaction(
+                budget: budget,
+                dateText: day(date),
+                income: income,
+                amount: value,
+                category: category.text,
+                line: lineId,
+                note: note.text,
+                pot: pot?.id,
+                fromPot: fromPot,
+              )
+            : app.changeTransaction(
+                budget: budget,
+                transaction: existing.id,
+                dateText: day(date),
+                income: income,
+                amount: value,
+                category: category.text,
+                line: lineId,
+                note: note.text,
+                pot: pot?.id,
+                fromPot: fromPot,
+              ),
       );
     },
+  );
+  if (remove && context.mounted) {
+    return removeTransaction(context, app, budget, existing!);
+  }
+  return changed;
+}
+
+/// Asks, then removes a transaction. A reflection is removed from the
+/// budget it comes from (its category is that budget's name).
+Future<bool> removeTransaction(
+  BuildContext context,
+  App app,
+  String budget,
+  TransactionRow transaction,
+) async {
+  final question = transaction.reflected
+      ? context.words.removeThereToo(transaction.category)
+      : context.words.removeTransactionQuestion;
+  if (!await confirm(context, question) || !context.mounted) {
+    return false;
+  }
+  return guard(
+    context,
+    () => app.removeTransaction(budget: budget, transaction: transaction.id),
   );
 }
 

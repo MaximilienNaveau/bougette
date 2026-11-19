@@ -266,6 +266,30 @@ impl Budget {
         &mut self,
         transaction: Transaction,
     ) -> Result<TransactionId, BudgetError> {
+        self.check(&transaction)?;
+        let id = transaction.id;
+        self.transactions.push(transaction);
+        Ok(id)
+    }
+
+    /// Replaces the transaction with `transaction`'s identifier by it,
+    /// after the same checks as `add_transaction`: a transaction edited.
+    pub fn replace_transaction(&mut self, transaction: Transaction) -> Result<(), BudgetError> {
+        self.check(&transaction)?;
+        // `iter_mut().find`: a mutable reference to the element, like a
+        // non-const iterator from `std::find_if`, assigned through `*`.
+        let slot = self
+            .transactions
+            .iter_mut()
+            .find(|t| t.id == transaction.id)
+            .ok_or(BudgetError::UnknownTransaction)?;
+        *slot = transaction;
+        Ok(())
+    }
+
+    /// Whether `transaction` fits this budget: its currency, its line and
+    /// its pot.
+    fn check(&self, transaction: &Transaction) -> Result<(), BudgetError> {
         if transaction.amount.currency() != self.currency {
             return Err(BudgetError::WrongCurrency);
         }
@@ -293,9 +317,7 @@ impl Budget {
             }
             self.pot(pot).ok_or(BudgetError::UnknownPot)?;
         }
-        let id = transaction.id;
-        self.transactions.push(transaction);
-        Ok(id)
+        Ok(())
     }
 
     /// From `from` on, line `id` has a new amount and schedule; months
@@ -969,6 +991,37 @@ mod tests {
         assert_eq!(
             budget.add_transaction(missing),
             Err(BudgetError::PotMismatch)
+        );
+    }
+
+    #[test]
+    fn a_transaction_is_edited_in_place() {
+        let (mut budget, rent, groceries) = household();
+        let id = budget
+            .add_transaction(cost(date(2026, 1, 10), 5000, "Food", Some(groceries)))
+            .unwrap();
+        // 50 became 55, a day later, with a note: same identifier.
+        let mut edited = budget.transactions()[0].clone();
+        edited.amount = eur(5500);
+        edited.date = date(2026, 1, 11);
+        edited.note = "market".into();
+        budget.replace_transaction(edited).unwrap();
+        assert_eq!(budget.transactions().len(), 1);
+        assert_eq!(budget.transactions()[0].id, id);
+        assert_eq!(budget.actual(month(2026, 1)).costs, eur(5500));
+        // Moved to an income line: refused, nothing changed.
+        let mut wrong = budget.transactions()[0].clone();
+        wrong.line = Some(budget.lines()[0].id); // the contributions
+        assert_eq!(
+            budget.replace_transaction(wrong),
+            Err(BudgetError::KindMismatch)
+        );
+        assert_eq!(budget.transactions()[0].line, Some(groceries));
+        // One that isn't there.
+        let stranger = cost(date(2026, 1, 1), 1, "Food", Some(rent));
+        assert_eq!(
+            budget.replace_transaction(stranger),
+            Err(BudgetError::UnknownTransaction)
         );
     }
 

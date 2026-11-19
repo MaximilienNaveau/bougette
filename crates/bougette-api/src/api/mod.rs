@@ -160,7 +160,12 @@ pub struct TransactionRow {
     pub category: String,
     /// The line it realises, by name, if any.
     pub line: Option<String>,
+    /// That line's identifier, to edit the transaction.
+    pub line_id: Option<String>,
     pub note: String,
+    /// The pot it moves money into, or out of if `from_pot`.
+    pub pot: Option<String>,
+    pub from_pot: bool,
 }
 
 /// Incomes, costs and their balance.
@@ -371,18 +376,7 @@ impl App {
     ) -> Result<String, String> {
         let day = date(&date_text)?;
         let line = line.map(|id| parse_id(&id).map(LineId)).transpose()?;
-        // Into the pot (an allocation), or paid from it.
-        let pot = pot
-            .map(|id| {
-                parse_id(&id).map(|id| {
-                    if from_pot {
-                        PotMove::PaidFrom(PotId(id))
-                    } else {
-                        PotMove::Into(PotId(id))
-                    }
-                })
-            })
-            .transpose()?;
+        let pot = pot_move(pot, from_pot)?;
         // On a line seen here but held by another budget (a planned
         // contribution), the transaction goes there, as that line's: an
         // income this member paid, in its category.
@@ -582,6 +576,67 @@ impl App {
         self.change(&budget, |budget| budget.remove_line(id))
     }
 
+    /// Changes transaction `transaction`, seen in `budget`, to the values
+    /// given (as for `add_transaction`); it keeps its identifier and its
+    /// payer or payee. One held by another budget (a contribution seen in
+    /// a personal budget) changes there, and only in its date, amount and
+    /// note: its kind, category, line and pot are that budget's.
+    #[allow(clippy::too_many_arguments)] // the fields of a transaction
+    pub fn change_transaction(
+        &self,
+        budget: String,
+        transaction: String,
+        date_text: String,
+        income: bool,
+        amount: i64,
+        category: String,
+        line: Option<String>,
+        note: String,
+        pot: Option<String>,
+        from_pot: bool,
+    ) -> Result<(), String> {
+        let id = TransactionId(parse_id(&transaction)?);
+        let day = date(&date_text)?;
+        let held_here = self
+            .load(&budget)?
+            .transactions()
+            .iter()
+            .any(|transaction| transaction.id == id);
+        // The budget to change, and whether all of it can change there.
+        let (target, all) = if held_here {
+            (budget, true)
+        } else {
+            let holder = self
+                .lock()
+                .budget_of_transaction(id)
+                .map_err(stored)?
+                .ok_or_else(|| BudgetError::UnknownTransaction.to_string())?;
+            (holder.id.to_string(), false)
+        };
+        let line = line.map(|id| parse_id(&id).map(LineId)).transpose()?;
+        let pot = pot_move(pot, from_pot)?;
+        self.change(&target, |budget| {
+            // `.cloned()`: an owned copy to edit, the original untouched
+            // until `replace_transaction` accepts the copy.
+            let mut edited = budget
+                .transactions()
+                .iter()
+                .find(|transaction| transaction.id == id)
+                .cloned()
+                .ok_or(BudgetError::UnknownTransaction)?;
+            edited.date = day;
+            edited.amount = Money::new(amount, budget.currency());
+            edited.note = note;
+            if all {
+                edited.kind = kind(income);
+                edited.category = category;
+                edited.line = line;
+                edited.pot = pot;
+            }
+            budget.replace_transaction(edited)
+        })
+    }
+
     /// Removes transaction `transaction`: from the budget that holds it,
     /// if it's seen here as a reflection.
     pub fn remove_transaction(&self, budget: String, transaction: String) -> Result<(), String> {
@@ -759,7 +814,13 @@ impl App {
                     .line
                     .and_then(|id| budget.line(id))
                     .map(|line| line.name.clone()),
+                line_id: transaction.line.map(|id| id.to_string()),
                 note: transaction.note.clone(),
+                pot: match transaction.pot {
+                    Some(PotMove::Into(pot) | PotMove::PaidFrom(pot)) => Some(pot.to_string()),
+                    None => None,
+                },
+                from_pot: matches!(transaction.pot, Some(PotMove::PaidFrom(_))),
             })
             .collect();
         let due = budget.plan(month, View::Due);
@@ -977,6 +1038,21 @@ fn repeat_of(schedule: Schedule) -> Option<Repeat> {
 fn parse_id(text: &str) -> Result<uuid::Uuid, String> {
     text.parse()
         .map_err(|_| format!("not an identifier: {text}"))
+}
+
+/// Money moving into pot `pot` (an allocation), or paid from it if
+/// `from_pot`; `None` without a pot.
+fn pot_move(pot: Option<String>, from_pot: bool) -> Result<Option<PotMove>, String> {
+    pot.map(|id| {
+        parse_id(&id).map(|id| {
+            if from_pot {
+                PotMove::PaidFrom(PotId(id))
+            } else {
+                PotMove::Into(PotId(id))
+            }
+        })
+    })
+    .transpose()
 }
 
 fn kind(income: bool) -> Kind {
@@ -1289,6 +1365,88 @@ mod tests {
             )
             .unwrap_err();
         assert!(refused.contains("only a cost"), "{refused}");
+    }
+
+    #[test]
+    fn a_transaction_is_edited_where_it_is_held() {
+        let app = app();
+        let today = day(2026, 11, 16);
+        let home = app.create_budget("Home".into(), "EUR".into()).unwrap();
+        app.set_personal(home.clone(), true).unwrap();
+        let flat = app.create_budget("Flat".into(), "EUR".into()).unwrap();
+        let line = app
+            .add_line(
+                home.clone(),
+                "Flat".into(),
+                "Contributions".into(),
+                false,
+                10000,
+                Repeat::Monthly,
+                "2026-01-01".into(),
+                None,
+                Some(flat.clone()),
+            )
+            .unwrap();
+        let add = |budget: &str, line: Option<String>, amount| {
+            app.add_transaction(
+                budget.into(),
+                "2026-11-03".into(),
+                false,
+                amount,
+                "Food".into(),
+                line,
+                String::new(),
+                None,
+                false,
+            )
+            .unwrap()
+        };
+        let groceries = add(&home, None, 4200);
+        let transfer = add(&home, Some(line.clone()), 10000);
+        let row = |budget: &str, id: &str| {
+            app.month_on(budget, "2026-11", today)
+                .unwrap()
+                .transactions
+                .into_iter()
+                .find(|row| row.id == id)
+                .unwrap()
+        };
+        let change = |id: &str, income, amount, category: &str, note: &str| {
+            app.change_transaction(
+                home.clone(),
+                id.into(),
+                "2026-11-04".into(),
+                income,
+                amount,
+                category.into(),
+                None,
+                note.into(),
+                None,
+                false,
+            )
+        };
+
+        // Home's own: anything changes, the identifier stays.
+        change(&groceries, true, 4500, "Refunds", "back").unwrap();
+        let edited = row(&home, &groceries);
+        assert_eq!(
+            (edited.date.as_str(), edited.income, edited.amount),
+            ("2026-11-04", true, 4500)
+        );
+        assert_eq!(
+            (edited.category.as_str(), edited.note.as_str()),
+            ("Refunds", "back")
+        );
+
+        // The contribution, edited from home: changed in the flat, its
+        // amount, date and note only (still the flat's income, on the line).
+        change(&transfer, true, 12000, "Ignored", "November").unwrap();
+        let there = row(&flat, &transfer);
+        assert_eq!((there.amount, there.date.as_str()), (12000, "2026-11-04"));
+        assert!(there.income);
+        assert_eq!(there.line_id.as_deref(), Some(line.as_str()));
+        assert_eq!(there.category, "Contributions");
+        assert_eq!(row(&home, &transfer).amount, 12000);
     }
 
     #[test]

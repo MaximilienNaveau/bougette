@@ -380,6 +380,12 @@ abstract class AppLocalizations {
   /// **'New transaction'**
   String get newTransaction;
 
+  /// No description provided for @changeTransaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Change the transaction'**
+  String get changeTransaction;
+
   /// No description provided for @newPot.
   ///
   /// In en, this message translates to:

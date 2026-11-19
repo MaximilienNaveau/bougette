@@ -163,6 +163,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get newTransaction => 'New transaction';
 
   @override
+  String get changeTransaction => 'Change the transaction';
+
+  @override
   String get newPot => 'New pot';
 
   @override

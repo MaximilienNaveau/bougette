@@ -8,7 +8,7 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `budgets_on`, `calendar_on`, `change`, `date`, `destinations`, `edit`, `holder_of_line`, `kind`, `line_home`, `load`, `lock`, `month_on`, `month_text`, `parse_id`, `parse_month`, `repeat_of`, `schedule`, `sent`, `shown`, `source`, `status`, `stored`, `today`, `totals`, `with`
+// These functions are ignored because they are not marked as `pub`: `budgets_on`, `calendar_on`, `change`, `date`, `destinations`, `edit`, `holder_of_line`, `kind`, `line_home`, `load`, `lock`, `month_on`, `month_text`, `parse_id`, `parse_month`, `pot_move`, `repeat_of`, `schedule`, `sent`, `shown`, `source`, `status`, `stored`, `today`, `totals`, `with`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<App>>
@@ -74,6 +74,24 @@ abstract class App implements RustOpaqueInterface {
     required PlatformInt64 amount,
     required Repeat repeat,
     required String from,
+  });
+
+  /// Changes transaction `transaction`, seen in `budget`, to the values
+  /// given (as for `add_transaction`); it keeps its identifier and its
+  /// payer or payee. One held by another budget (a contribution seen in
+  /// a personal budget) changes there, and only in its date, amount and
+  /// note: its kind, category, line and pot are that budget's.
+  Future<void> changeTransaction({
+    required String budget,
+    required String transaction,
+    required String dateText,
+    required bool income,
+    required PlatformInt64 amount,
+    required String category,
+    String? line,
+    required String note,
+    String? pot,
+    required bool fromPot,
   });
 
   /// Creates a budget; returns its identifier.
@@ -714,7 +732,14 @@ class TransactionRow {
 
   /// The line it realises, by name, if any.
   final String? line;
+
+  /// That line's identifier, to edit the transaction.
+  final String? lineId;
   final String note;
+
+  /// The pot it moves money into, or out of if `from_pot`.
+  final String? pot;
+  final bool fromPot;
 
   const TransactionRow({
     required this.id,
@@ -724,7 +749,10 @@ class TransactionRow {
     required this.amount,
     required this.category,
     this.line,
+    this.lineId,
     required this.note,
+    this.pot,
+    required this.fromPot,
   });
 
   @override
@@ -736,7 +764,10 @@ class TransactionRow {
       amount.hashCode ^
       category.hashCode ^
       line.hashCode ^
-      note.hashCode;
+      lineId.hashCode ^
+      note.hashCode ^
+      pot.hashCode ^
+      fromPot.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -750,5 +781,8 @@ class TransactionRow {
           amount == other.amount &&
           category == other.category &&
           line == other.line &&
-          note == other.note;
+          lineId == other.lineId &&
+          note == other.note &&
+          pot == other.pot &&
+          fromPot == other.fromPot;
 }

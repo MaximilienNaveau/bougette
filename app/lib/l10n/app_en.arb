@@ -92,6 +92,7 @@
   "by": "By",
   "newLine": "New line",
   "newTransaction": "New transaction",
+  "changeTransaction": "Change the transaction",
   "newPot": "New pot",
   "feedsNoPot": "Feeds no pot",
   "feedsPot": "Feeds {pot}",

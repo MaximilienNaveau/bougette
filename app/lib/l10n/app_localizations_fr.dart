@@ -163,6 +163,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get newTransaction => 'Nouvelle opération';
 
   @override
+  String get changeTransaction => 'Modifier l\'opération';
+
+  @override
   String get newPot => 'Nouvelle cagnotte';
 
   @override

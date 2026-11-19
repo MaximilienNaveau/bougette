@@ -226,7 +226,13 @@ class _BudgetScreenState extends State<BudgetScreen> {
                         view: view,
                         onLine: (line) => _openLine(line, view),
                         onTransaction: (transaction) => _then(
-                          removeTransaction(context, app, _budget, transaction),
+                          addTransaction(
+                            context,
+                            app,
+                            _budget,
+                            view,
+                            existing: transaction,
+                          ),
                         ),
                         onAddPot: () => _then(addPot(context, app, _budget)),
                       ),
