@@ -2304,6 +2304,7 @@ impl SseDecode for crate::api::MonthView {
         let mut var_running = <i64>::sse_decode(deserializer);
         let mut var_pots = <Vec<crate::api::PotRow>>::sse_decode(deserializer);
         let mut var_destinations = <Vec<crate::api::BudgetChoice>>::sse_decode(deserializer);
+        let mut var_firstYear = <i16>::sse_decode(deserializer);
         return crate::api::MonthView {
             budget: var_budget,
             currency: var_currency,
@@ -2319,6 +2320,7 @@ impl SseDecode for crate::api::MonthView {
             running: var_running,
             pots: var_pots,
             destinations: var_destinations,
+            first_year: var_firstYear,
         };
     }
 }
@@ -2797,6 +2799,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::MonthView {
             self.running.into_into_dart().into_dart(),
             self.pots.into_into_dart().into_dart(),
             self.destinations.into_into_dart().into_dart(),
+            self.first_year.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -3232,6 +3235,7 @@ impl SseEncode for crate::api::MonthView {
         <i64>::sse_encode(self.running, serializer);
         <Vec<crate::api::PotRow>>::sse_encode(self.pots, serializer);
         <Vec<crate::api::BudgetChoice>>::sse_encode(self.destinations, serializer);
+        <i16>::sse_encode(self.first_year, serializer);
     }
 }
 

@@ -1,6 +1,6 @@
 // A budget, in one screen: its year's twelve months at the top
-// (doc/scope.md: the current year by default, moving year by year without
-// limit, each month coloured by where its figures come from and by any
+// (doc/scope.md: the current year by default, moving year by year back to
+// its first entry and without limit forward, each month coloured by where its figures come from and by any
 // overspending), in rows that fit the window, and below it the selected
 // month's lines, totals, transactions and pots, ready to edit. It opens on
 // the current month.
@@ -155,7 +155,11 @@ class _BudgetScreenState extends State<BudgetScreen> {
             title: Text(_name),
             actions: [
               IconButton(
-                onPressed: () => _moveYear(-1),
+                // Not before the year of the budget's first entry (null
+                // `onPressed` greys the button out).
+                onPressed: view != null && _year <= view.firstYear
+                    ? null
+                    : () => _moveYear(-1),
                 icon: const Icon(Icons.chevron_left),
                 tooltip: context.words.previousYear,
               ),

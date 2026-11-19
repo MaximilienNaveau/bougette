@@ -206,6 +206,10 @@ pub struct MonthView {
     /// budgets in the same currency, for a personal budget only (that's
     /// where the line shows, see `add_line`).
     pub destinations: Vec<BudgetChoice>,
+    /// The earliest year to show: that of the budget's first entry, or
+    /// the current year if it has none before (no empty years to go
+    /// through).
+    pub first_year: i16,
 }
 
 /// When a new line is due, from its first due date on. A plain enum (no
@@ -791,6 +795,10 @@ impl App {
             running: budget.running_balance(month, today).minor_units(),
             pots,
             destinations,
+            // `map_or`: the Option's value transformed, or the default.
+            first_year: budget
+                .first_day()
+                .map_or(today.year(), |day| day.year().min(today.year())),
         })
     }
 
@@ -1281,6 +1289,43 @@ mod tests {
             )
             .unwrap_err();
         assert!(refused.contains("only a cost"), "{refused}");
+    }
+
+    #[test]
+    fn the_calendar_starts_at_the_first_entry() {
+        let app = app();
+        let today = day(2026, 11, 16);
+        let id = app.create_budget("Flat".into(), "EUR".into()).unwrap();
+        let first_year = || app.month_on(&id, "2026-11", today).unwrap().first_year;
+        // Empty, or with entries to come only: this year.
+        assert_eq!(first_year(), 2026);
+        app.add_line(
+            id.clone(),
+            "Rent".into(),
+            "Rent".into(),
+            true,
+            50000,
+            Repeat::Monthly,
+            "2027-01-05".into(),
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(first_year(), 2026);
+        // A transaction back in 2021: the calendar goes back to it.
+        app.add_transaction(
+            id.clone(),
+            "2021-03-25".into(),
+            true,
+            26870,
+            "Rent".into(),
+            None,
+            String::new(),
+            None,
+            false,
+        )
+        .unwrap();
+        assert_eq!(first_year(), 2021);
     }
 
     #[test]

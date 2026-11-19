@@ -133,6 +133,9 @@ void main() {
       for (final month in ['January', 'June', 'December']) {
         expect(find.text(month).hitTestable(), findsOneWidget, reason: month);
       }
+      // Empty: no year before this one to go to.
+      final back = find.widgetWithIcon(IconButton, Icons.chevron_left);
+      expect(tester.widget<IconButton>(back).onPressed, isNull);
       await tester.pageBack();
       await settle(tester);
     }

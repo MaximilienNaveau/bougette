@@ -2007,8 +2007,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   MonthView dco_decode_month_view(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 14)
-      throw Exception('unexpected arr length: expect 14 but see ${arr.length}');
+    if (arr.length != 15)
+      throw Exception('unexpected arr length: expect 15 but see ${arr.length}');
     return MonthView(
       budget: dco_decode_String(arr[0]),
       currency: dco_decode_String(arr[1]),
@@ -2024,6 +2024,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       running: dco_decode_i_64(arr[11]),
       pots: dco_decode_list_pot_row(arr[12]),
       destinations: dco_decode_list_budget_choice(arr[13]),
+      firstYear: dco_decode_i_16(arr[14]),
     );
   }
 
@@ -2532,6 +2533,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_running = sse_decode_i_64(deserializer);
     var var_pots = sse_decode_list_pot_row(deserializer);
     var var_destinations = sse_decode_list_budget_choice(deserializer);
+    var var_firstYear = sse_decode_i_16(deserializer);
     return MonthView(
       budget: var_budget,
       currency: var_currency,
@@ -2547,6 +2549,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       running: var_running,
       pots: var_pots,
       destinations: var_destinations,
+      firstYear: var_firstYear,
     );
   }
 
@@ -3043,6 +3046,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_64(self.running, serializer);
     sse_encode_list_pot_row(self.pots, serializer);
     sse_encode_list_budget_choice(self.destinations, serializer);
+    sse_encode_i_16(self.firstYear, serializer);
   }
 
   @protected

@@ -509,6 +509,11 @@ class MonthView {
   /// where the line shows, see `add_line`).
   final List<BudgetChoice> destinations;
 
+  /// The earliest year to show: that of the budget's first entry, or
+  /// the current year if it has none before (no empty years to go
+  /// through).
+  final int firstYear;
+
   const MonthView({
     required this.budget,
     required this.currency,
@@ -524,6 +529,7 @@ class MonthView {
     required this.running,
     required this.pots,
     required this.destinations,
+    required this.firstYear,
   });
 
   @override
@@ -541,7 +547,8 @@ class MonthView {
       status.hashCode ^
       running.hashCode ^
       pots.hashCode ^
-      destinations.hashCode;
+      destinations.hashCode ^
+      firstYear.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -561,7 +568,8 @@ class MonthView {
           status == other.status &&
           running == other.running &&
           pots == other.pots &&
-          destinations == other.destinations;
+          destinations == other.destinations &&
+          firstYear == other.firstYear;
 }
 
 /// A pot and what it holds at the end of the month.

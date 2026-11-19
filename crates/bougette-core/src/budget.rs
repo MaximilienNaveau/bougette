@@ -199,6 +199,18 @@ impl Budget {
         &self.transactions
     }
 
+    /// The day of its first entry: the earliest start of a line or date of
+    /// a transaction. `None` for an empty budget.
+    pub fn first_day(&self) -> Option<Date> {
+        // `chain` joins two iterators end to end; `min` of an iterator is
+        // an Option, `None` when it is empty (no exception, no sentinel).
+        self.lines
+            .iter()
+            .map(|line| line.starts_on())
+            .chain(self.transactions.iter().map(|t| t.date))
+            .min()
+    }
+
     /// The line with this identifier, if the budget has it.
     pub fn line(&self, id: LineId) -> Option<&Line> {
         self.lines.iter().find(|line| line.id == id)
@@ -958,6 +970,18 @@ mod tests {
             budget.add_transaction(missing),
             Err(BudgetError::PotMismatch)
         );
+    }
+
+    #[test]
+    fn the_first_day_is_the_earliest_line_or_transaction() {
+        assert_eq!(Budget::new("Empty", Currency::EUR).first_day(), None);
+        // Lines from 2026-01-01; a transaction before, in December.
+        let (mut budget, ..) = household();
+        assert_eq!(budget.first_day(), Some(date(2026, 1, 1)));
+        budget
+            .add_transaction(cost(date(2025, 12, 20), 100, "Food", None))
+            .unwrap();
+        assert_eq!(budget.first_day(), Some(date(2025, 12, 20)));
     }
 
     #[test]
