@@ -310,14 +310,22 @@ impl Line {
                 // `std::accumulate`.
                 .fold(Money::zero(currency), |total, amount| total + amount),
             View::Smoothed => {
-                // The line counts from the later of its start and the 1st.
-                let day = self.starts_on().max(month.first_day());
-                if day > month.last_day() {
-                    return Money::zero(currency); // it starts after this month
+                // The amount in force at the end of the month, or on the
+                // line's last day if it ends during it: a change from the
+                // 19th counts for the whole month, as the month's view
+                // shows it (and as what's due that month, for a monthly
+                // line due from the 19th on).
+                let start = self.starts_on().max(month.first_day());
+                // `map_or`: the end date if any, else the month's last day.
+                let end = self
+                    .ends_on
+                    .map_or(month.last_day(), |end| end.min(month.last_day()));
+                if start > end {
+                    return Money::zero(currency); // not applying this month
                 }
                 // `let ... else`: bind the revision, or leave the function
-                // with zero when there is none (the line has ended).
-                let Some(revision) = self.revision_on(day) else {
+                // with zero when there is none.
+                let Some(revision) = self.revision_on(end) else {
                     return Money::zero(currency);
                 };
                 // A one-off line has no smoothed amount: count what's due.
@@ -386,6 +394,34 @@ mod tests {
             monthly(date(2026, 1, 5)),
         );
         assert_eq!(line, Err(LineError::NotPositive));
+    }
+
+    #[test]
+    fn a_change_during_a_month_is_its_smoothed_amount() {
+        // The kitchen savings: 100 a month on the 19th, then 50 from
+        // 19 December.
+        let mut line = Line::new(
+            "Kitchen",
+            "Savings",
+            Kind::Cost,
+            date(2026, 11, 19),
+            eur(10000),
+            monthly(date(2026, 11, 19)),
+        )
+        .unwrap();
+        line.change_from(date(2026, 12, 19), eur(5000), monthly(date(2026, 11, 19)))
+            .unwrap();
+        // December: due and smoothed agree.
+        assert_eq!(line.amount_in(month(2026, 12), View::Due), eur(5000));
+        assert_eq!(line.amount_in(month(2026, 12), View::Smoothed), eur(5000));
+        assert_eq!(line.amount_in(month(2026, 11), View::Smoothed), eur(10000));
+        // Ended on 10 January: January still counts, at its last amount;
+        // February not.
+        line.end_on(Some(date(2027, 1, 10))).unwrap();
+        assert_eq!(line.amount_in(month(2027, 1), View::Smoothed), eur(5000));
+        assert_eq!(line.amount_in(month(2027, 2), View::Smoothed), eur(0));
+        // Before it starts: nothing.
+        assert_eq!(line.amount_in(month(2026, 10), View::Smoothed), eur(0));
     }
 
     #[test]
