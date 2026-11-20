@@ -154,21 +154,6 @@ class _BudgetScreenState extends State<BudgetScreen> {
           appBar: AppBar(
             title: Text(_name),
             actions: [
-              IconButton(
-                // Not before the year of the budget's first entry (null
-                // `onPressed` greys the button out).
-                onPressed: view != null && _year <= view.firstYear
-                    ? null
-                    : () => _moveYear(-1),
-                icon: const Icon(Icons.chevron_left),
-                tooltip: context.words.previousYear,
-              ),
-              Center(child: Text('$_year')),
-              IconButton(
-                onPressed: () => _moveYear(1),
-                icon: const Icon(Icons.chevron_right),
-                tooltip: context.words.nextYear,
-              ),
               // A menu of the budget's settings.
               PopupMenuButton<VoidCallback>(
                 onSelected: (action) => action(),
@@ -214,6 +199,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
                 ),
           body: Column(
             children: [
+              _years(view),
               _strip(currency),
               const Divider(height: 1),
               // `Expanded`: the month takes the rest of the height.
@@ -241,6 +227,41 @@ class _BudgetScreenState extends State<BudgetScreen> {
           ),
         );
       },
+    );
+  }
+
+  /// The year shown, between buttons to the years before and after, each
+  /// naming the year it goes to: right above the months it changes, and
+  /// apart from the screen's back arrow.
+  Widget _years(MonthView? view) {
+    final text = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          TextButton.icon(
+            // Not before the year of the budget's first entry (null
+            // `onPressed` greys the button out).
+            onPressed: view != null && _year <= view.firstYear
+                ? null
+                : () => _moveYear(-1),
+            icon: const Icon(Icons.chevron_left),
+            label: Text('${_year - 1}'),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text('$_year', style: text.titleLarge),
+          ),
+          TextButton.icon(
+            onPressed: () => _moveYear(1),
+            // The arrow after the year, pointing where it goes.
+            iconAlignment: IconAlignment.end,
+            icon: const Icon(Icons.chevron_right),
+            label: Text('${_year + 1}'),
+          ),
+        ],
+      ),
     );
   }
 

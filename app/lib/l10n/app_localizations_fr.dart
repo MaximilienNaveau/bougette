@@ -35,12 +35,6 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
-  String get previousYear => 'Année précédente';
-
-  @override
-  String get nextYear => 'Année suivante';
-
-  @override
   String get rename => 'Renommer';
 
   @override

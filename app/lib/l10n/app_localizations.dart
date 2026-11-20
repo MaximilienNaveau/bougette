@@ -140,18 +140,6 @@ abstract class AppLocalizations {
   /// **'Running {amount}'**
   String runningAmount(String amount);
 
-  /// No description provided for @previousYear.
-  ///
-  /// In en, this message translates to:
-  /// **'Previous year'**
-  String get previousYear;
-
-  /// No description provided for @nextYear.
-  ///
-  /// In en, this message translates to:
-  /// **'Next year'**
-  String get nextYear;
-
   /// No description provided for @rename.
   ///
   /// In en, this message translates to:

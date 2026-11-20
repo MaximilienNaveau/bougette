@@ -178,9 +178,17 @@ void main() {
       for (final month in ['January', 'June', 'December']) {
         expect(find.text(month).hitTestable(), findsOneWidget, reason: month);
       }
-      // Empty: no year before this one to go to.
-      final back = find.widgetWithIcon(IconButton, Icons.chevron_left);
-      expect(tester.widget<IconButton>(back).onPressed, isNull);
+      // Empty: no year before this one to go to; the next one, named.
+      final year = DateTime.now().year;
+      final back = find.ancestor(
+        of: find.byIcon(Icons.chevron_left),
+        matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+      );
+      expect(tester.widget<ButtonStyleButton>(back).enabled, isFalse);
+      await tester.tap(find.text('${year + 1}'));
+      await settle(tester);
+      expect(find.text('${year + 2}'), findsOneWidget);
+      expect(tester.widget<ButtonStyleButton>(back).enabled, isTrue);
       await tester.pageBack();
       await settle(tester);
     }

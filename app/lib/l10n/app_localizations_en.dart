@@ -35,12 +35,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get previousYear => 'Previous year';
-
-  @override
-  String get nextYear => 'Next year';
-
-  @override
   String get rename => 'Rename';
 
   @override

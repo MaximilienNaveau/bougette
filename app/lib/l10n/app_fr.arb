@@ -7,8 +7,6 @@
   "noBudget": "Pas encore de budget : ajoutez-en un.",
   "monthlyAmount": "Mensuel {amount}",
   "runningAmount": "Cumulé {amount}",
-  "previousYear": "Année précédente",
-  "nextYear": "Année suivante",
   "rename": "Renommer",
   "personalBudget": "Mon budget personnel",
   "sourceActual": "réel",
