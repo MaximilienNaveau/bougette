@@ -8,7 +8,7 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `budgets_on`, `calendar_on`, `change`, `date`, `destinations`, `edit`, `holder_of_line`, `kind`, `line_home`, `load`, `lock`, `month_on`, `month_text`, `parse_id`, `parse_month`, `pot_move`, `repeat_of`, `schedule`, `sent`, `shown`, `source`, `status`, `stored`, `today`, `totals`, `with`
+// These functions are ignored because they are not marked as `pub`: `budgets_on`, `calendar_on`, `change`, `date`, `destinations`, `edit`, `export_on`, `holder_of_line`, `kind`, `line_home`, `load`, `lock`, `month_on`, `month_text`, `parse_id`, `parse_month`, `pot_move`, `repeat_of`, `schedule`, `sent`, `shown`, `source`, `status`, `stored`, `today`, `totals`, `with`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<App>>
@@ -106,6 +106,11 @@ abstract class App implements RustOpaqueInterface {
     required String line,
     String? lastDay,
   });
+
+  /// Writes every budget as JSON, and their transactions as CSV, into
+  /// `folder` (see `bougette_core::export::files`); returns the paths
+  /// written.
+  Future<List<String>> exportFiles({required String folder});
 
   /// Whether a recovery phrase locks a backup on the server.
   Future<bool> hasRecovery();

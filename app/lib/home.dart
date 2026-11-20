@@ -1,6 +1,8 @@
 // The home screen (doc/scope.md): my budgets, each with its monthly
 // balance and running balance, without an aggregate total.
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import 'budget.dart';
@@ -58,6 +60,23 @@ class _HomeScreenState extends State<HomeScreen> {
     _reload();
   }
 
+  /// Exports every budget (JSON) and the transactions (CSV) into the
+  /// Documents folder, or the home folder without one, and says where.
+  Future<void> _export() async {
+    final home = Platform.environment['HOME'] ?? '.';
+    final documents = Directory('$home/Documents');
+    final folder = documents.existsSync() ? documents.path : home;
+    final ok = await guard(
+      context,
+      () => widget.app.exportFiles(folder: folder),
+    );
+    if (ok && mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.words.exportedTo(folder))));
+    }
+  }
+
   Future<void> _create() async {
     final name = await askText(
       context,
@@ -79,6 +98,11 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text(context.words.myBudgets),
         actions: [
+          IconButton(
+            onPressed: _export,
+            icon: const Icon(Icons.download),
+            tooltip: context.words.export,
+          ),
           IconButton(
             onPressed: _sync,
             icon: const Icon(Icons.sync),

@@ -690,7 +690,34 @@ impl App {
         })
     }
 
+    /// Writes every budget as JSON, and their transactions as CSV, into
+    /// `folder` (see `bougette_core::export::files`); returns the paths
+    /// written.
+    pub fn export_files(&self, folder: String) -> Result<Vec<String>, String> {
+        self.export_on(&folder, today())
+    }
+
     // The same, with `today` given: for the tests.
+
+    fn export_on(&self, folder: &str, today: Date) -> Result<Vec<String>, String> {
+        // The list first, in its own statement: the lock is released at its
+        // `;`. In the `for` line itself, the lock (a temporary) would last
+        // the whole loop, and `load` locking again would wait forever (a
+        // Mutex can't be locked twice by the same thread).
+        let ids = self.lock().budgets().map_err(stored)?;
+        let mut budgets = Vec::new();
+        for (id, _) in ids {
+            budgets.push(self.load(&id.to_string())?);
+        }
+        let mut paths = Vec::new();
+        for (name, contents) in bougette_core::export::files(&budgets, today) {
+            let path = std::path::Path::new(folder).join(name);
+            std::fs::write(&path, contents)
+                .map_err(|error| format!("cannot write {}: {error}", path.display()))?;
+            paths.push(path.display().to_string());
+        }
+        Ok(paths)
+    }
 
     fn budgets_on(&self, today: Date) -> Result<Vec<BudgetSummary>, String> {
         let month = Month::of(today);
@@ -1447,6 +1474,31 @@ mod tests {
         assert_eq!(there.line_id.as_deref(), Some(line.as_str()));
         assert_eq!(there.category, "Contributions");
         assert_eq!(row(&home, &transfer).amount, 12000);
+    }
+
+    #[test]
+    fn every_budget_is_exported_into_a_folder() {
+        let app = app();
+        household(&app);
+        app.create_budget("Flat".into(), "EUR".into()).unwrap();
+        let folder = std::env::temp_dir().join(format!("bougette-export-{}", std::process::id()));
+        std::fs::create_dir_all(&folder).unwrap();
+        let paths = app
+            .export_on(folder.to_str().unwrap(), day(2026, 11, 20))
+            .unwrap();
+        assert_eq!(paths.len(), 2);
+        assert!(paths[0].ends_with("bougette-2026-11-20.json"));
+        assert!(paths[1].ends_with("bougette-2026-11-20-operations.csv"));
+        let json = std::fs::read_to_string(&paths[0]).unwrap();
+        assert!(json.contains("\"name\": \"Flat\""));
+        assert!(json.contains("\"name\": \"Household\""));
+        let csv = std::fs::read_to_string(&paths[1]).unwrap();
+        assert!(csv.starts_with("budget,date,kind,amount,"));
+        // A folder that isn't there: an error in words, nothing panics.
+        let missing = folder.join("nowhere");
+        let refused = app.export_on(missing.to_str().unwrap(), day(2026, 11, 20));
+        assert!(refused.unwrap_err().starts_with("cannot write"));
+        std::fs::remove_dir_all(folder).unwrap();
     }
 
     #[test]

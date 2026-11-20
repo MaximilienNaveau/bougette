@@ -859,6 +859,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Send it elsewhere from a date…'**
   String get redirect;
+
+  /// No description provided for @export.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get export;
+
+  /// No description provided for @exportedTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved in {folder}'**
+  String exportedTo(String folder);
 }
 
 class _AppLocalizationsDelegate

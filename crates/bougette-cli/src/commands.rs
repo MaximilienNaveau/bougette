@@ -29,6 +29,8 @@ Budgets
                                    repayments in shared budgets show in it
   show BUDGET [MONTH]              a month: plan, actual, forecast, pots
   year BUDGET [YEAR]               the balances, month by month
+  export [FOLDER]                  every budget as JSON, and the transactions
+                                   as CSV, into FOLDER (here by default)
 
 Lines (the plan)
   line add BUDGET NAME CATEGORY income|cost AMOUNT SCHEDULE FIRST [--pot POT]
@@ -144,6 +146,8 @@ pub fn run(words: &[&str], options: &Options, context: &mut Context) -> Result<S
     // automatically, `*name` does it by hand.
     match words {
         ["budgets"] => budgets(context),
+        ["export"] => export(context, "."),
+        ["export", folder] => export(context, folder),
         ["budget", "new", name] => new_budget(context, name, "EUR"),
         ["budget", "new", name, currency] => new_budget(context, name, currency),
         ["budget", "personal", budget] => edit(context, budget, |budget| {
@@ -351,6 +355,25 @@ fn add_pot(
 
 /// The home screen: each budget with its monthly balance (smoothed plan)
 /// and running balance at the end of the current month.
+/// Writes the export files of every budget into `folder` (see
+/// `bougette_core::export::files`).
+fn export(context: &mut Context, folder: &str) -> Result<String, String> {
+    let mut budgets = Vec::new();
+    for (id, _) in stored(context.store.budgets())? {
+        budgets.push(find_budget(context.store, &id.to_string())?);
+    }
+    let mut out = String::new();
+    for (name, contents) in bougette_core::export::files(&budgets, context.today) {
+        // `Path::join`: the folder and the name with a separator, like
+        // `std::filesystem::path / name`.
+        let path = std::path::Path::new(folder).join(name);
+        std::fs::write(&path, contents)
+            .map_err(|error| format!("cannot write {}: {error}", path.display()))?;
+        out += &format!("Wrote {}\n", path.display());
+    }
+    Ok(out)
+}
+
 fn budgets(context: &mut Context) -> Result<String, String> {
     let month = Month::of(context.today);
     let mut out = String::new();

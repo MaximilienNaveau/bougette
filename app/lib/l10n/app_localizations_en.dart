@@ -432,4 +432,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get redirect => 'Send it elsewhere from a date…';
+
+  @override
+  String get export => 'Export';
+
+  @override
+  String exportedTo(String folder) {
+    return 'Saved in $folder';
+  }
 }

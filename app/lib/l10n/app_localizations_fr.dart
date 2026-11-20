@@ -433,4 +433,12 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get redirect => 'L\'envoyer ailleurs à partir d\'une date…';
+
+  @override
+  String get export => 'Exporter';
+
+  @override
+  String exportedTo(String folder) {
+    return 'Enregistré dans $folder';
+  }
 }

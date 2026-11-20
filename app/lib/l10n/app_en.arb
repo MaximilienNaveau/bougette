@@ -261,5 +261,14 @@
     }
   },
   "whereItGoes": "Where its money goes",
-  "redirect": "Send it elsewhere from a date…"
+  "redirect": "Send it elsewhere from a date…",
+  "export": "Export",
+  "exportedTo": "Saved in {folder}",
+  "@exportedTo": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  }
 }

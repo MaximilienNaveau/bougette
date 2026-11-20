@@ -126,5 +126,7 @@
   "removeAmountQuestion": "Supprimer ce changement ? Le montant précédent continue.",
   "heldIn": "Ce poste appartient au budget {budget} : les modifications y sont faites.",
   "whereItGoes": "Où va son argent",
-  "redirect": "L'envoyer ailleurs à partir d'une date…"
+  "redirect": "L'envoyer ailleurs à partir d'une date…",
+  "export": "Exporter",
+  "exportedTo": "Enregistré dans {folder}"
 }
