@@ -121,6 +121,8 @@ pub enum BudgetError {
     LineInUse,
     /// The line has transactions from the date it would leave this budget.
     RealisedFrom,
+    /// A transaction being restored, whose line is deleted too.
+    LineGone,
     /// The line refused the change.
     // A variant can carry data: this one wraps the line's own error.
     Line(LineError),
@@ -153,6 +155,7 @@ impl std::fmt::Display for BudgetError {
                 "a line keeps at least one amount: remove the line instead"
             }
             BudgetError::Line(LineError::Ended) => "the line has ended by that date",
+            BudgetError::LineGone => "its line is in the trash too: restore the line first",
             BudgetError::RealisedFrom => {
                 "the line has transactions from that date: remove them first, or choose a later date"
             }

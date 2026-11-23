@@ -18,6 +18,7 @@ class LineScreen extends StatefulWidget {
     required this.currency,
     required this.pots,
     required this.destinations,
+    this.onRestored,
   });
 
   final App app;
@@ -28,6 +29,8 @@ class LineScreen extends StatefulWidget {
   // (see `MonthView`).
   final List<PotRow> pots;
   final List<BudgetChoice> destinations;
+  // Called if the line, once removed, is put back (Undo).
+  final VoidCallback? onRestored;
 
   @override
   State<LineScreen> createState() => _LineScreenState();
@@ -237,7 +240,11 @@ class _LineScreenState extends State<LineScreen> {
       context,
       () => _app.removeLine(budget: widget.budget, line: widget.line),
     );
-    if (removed && mounted) Navigator.of(context).pop();
+    if (removed && mounted) {
+      // Offered from here, shown on the screen below once this one closes.
+      offerUndo(context, _app, widget.budget, widget.line, widget.onRestored);
+      Navigator.of(context).pop();
+    }
   }
 
   @override

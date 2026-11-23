@@ -131,16 +131,7 @@ type Fields = HashMap<String, Option<String>>;
 /// Rebuilds a budget from its fields, skipping deleted entities. `None` if
 /// there is no budget entity or it was deleted.
 pub fn decode(records: &Records) -> Result<Option<Budget>, Corrupt> {
-    // Group the fields by entity: kind → identifier → fields.
-    let mut entities: HashMap<&str, BTreeMap<&str, Fields>> = HashMap::new();
-    for ((entity, id, field), value) in records {
-        entities
-            .entry(entity.as_str()) // like `map[key]`, inserting if absent
-            .or_default()
-            .entry(id.as_str())
-            .or_default()
-            .insert(field.clone(), value.clone());
-    }
+    let mut entities = group(records);
     // Drop the deleted entities. `retain` on a map keeps the entries for
     // which the closure returns true.
     for by_id in entities.values_mut() {
@@ -182,62 +173,154 @@ pub fn decode(records: &Records) -> Result<Option<Budget>, Corrupt> {
             .insert(from, fields);
     }
     for (id, fields) in of_kind("line") {
-        // A line whose revisions were all deleted can't be rebuilt.
-        let mut line_revisions = revisions.get(id).into_iter().flatten();
-        let Some((from, first)) = line_revisions.next() else {
-            return Err(Corrupt(format!("line {id} has no revision")));
-        };
-        let mut line = Line::new(
-            text(fields, "name")?,
-            text(fields, "category")?,
-            decode_kind(text(fields, "kind")?)?,
-            *from,
-            amount(first, currency)?,
-            decode_schedule(text(first, "schedule")?)?,
-        )
-        .map_err(|error| Corrupt(format!("line {id}: {error:?}")))?;
-        for (from, revision) in line_revisions {
-            line.change_from(
-                *from,
-                amount(revision, currency)?,
-                decode_schedule(text(revision, "schedule")?)?,
-            )
-            .map_err(|error| Corrupt(format!("line {id}: {error:?}")))?;
-        }
-        let ends_on = optional(fields, "ends_on").map(parse_date).transpose()?;
-        line.end_on(ends_on)
-            .map_err(|error| Corrupt(format!("line {id}: {error:?}")))?;
-        line.id = LineId(parse_uuid(id)?);
-        line.pot = optional(fields, "pot")
-            .map(|pot| parse_uuid(pot).map(PotId))
-            .transpose()?;
-        // Absent from lines written before lines had a payer: `None`.
-        line.payer = optional(fields, "payer").map(|member| MemberId(member.to_string()));
+        let line = decode_line(id, fields, revisions.get(id), currency)?;
         budget
             .add_line(line)
             .map_err(|error| Corrupt(format!("line {id}: {error:?}")))?;
     }
 
     for (id, fields) in of_kind("transaction") {
-        let transaction = Transaction {
-            id: TransactionId(parse_uuid(id)?),
-            date: parse_date(text(fields, "date")?)?,
-            kind: decode_kind(text(fields, "kind")?)?,
-            amount: amount(fields, currency)?,
-            category: text(fields, "category")?.to_string(),
-            line: optional(fields, "line")
-                .map(|line| parse_uuid(line).map(LineId))
-                .transpose()?,
-            pot: optional(fields, "pot").map(decode_pot_move).transpose()?,
-            note: text(fields, "note")?.to_string(),
-            payer: optional(fields, "payer").map(|member| MemberId(member.to_string())),
-            payee: optional(fields, "payee").map(|member| MemberId(member.to_string())),
-        };
         budget
-            .add_transaction(transaction)
+            .add_transaction(decode_transaction(id, fields, currency)?)
             .map_err(|error| Corrupt(format!("transaction {id}: {error:?}")))?;
     }
     Ok(Some(budget))
+}
+
+/// A deleted line or transaction, rebuilt as it was.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Trashed {
+    Line(Line),
+    Transaction(Transaction),
+}
+
+/// The deleted lines and transactions in `records`, each with the
+/// timestamp of its deletion mark (`deleted_at`: kind and identifier →
+/// timestamp, for the deleted entities). A line comes back with the
+/// revisions it had when it was deleted: those deleted with it, or
+/// after; not those replaced before.
+pub fn trashed(
+    records: &Records,
+    deleted_at: &HashMap<(String, String), String>,
+) -> Result<Vec<(String, Trashed)>, Corrupt> {
+    let entities = group(records);
+    let empty = BTreeMap::new();
+    let of_kind = |kind: &str| entities.get(kind).unwrap_or(&empty);
+    let Some(budget) = of_kind("budget").values().next() else {
+        return Ok(Vec::new());
+    };
+    let code = text(budget, "currency")?;
+    let currency = Currency::from_code(code).ok_or_else(|| corrupt("currency", code))?;
+    // When `kind`/`id` was deleted, if it was.
+    let deleted = |kind: &str, id: &str| deleted_at.get(&(kind.to_string(), id.to_string()));
+
+    let mut out = Vec::new();
+    for (id, fields) in of_kind("transaction") {
+        if let Some(when) = deleted("transaction", id) {
+            let transaction = decode_transaction(id, fields, currency)?;
+            out.push((when.clone(), Trashed::Transaction(transaction)));
+        }
+    }
+    for (id, fields) in of_kind("line") {
+        let Some(when) = deleted("line", id) else {
+            continue;
+        };
+        // Its revisions as they were when the line was deleted. Timestamps
+        // compare as text (see clock.rs).
+        let mut revisions = BTreeMap::new();
+        for (revision, revision_fields) in of_kind("revision") {
+            let current = match deleted("revision", revision) {
+                None => true,
+                Some(gone) => gone >= when,
+            };
+            if current && text(revision_fields, "line")? == *id {
+                let from = parse_date(text(revision_fields, "from")?)?;
+                revisions.insert(from, revision_fields);
+            }
+        }
+        let line = decode_line(id, fields, Some(&revisions), currency)?;
+        out.push((when.clone(), Trashed::Line(line)));
+    }
+    // The most recent first: timestamps sort as text.
+    out.sort_by(|a, b| b.0.cmp(&a.0));
+    Ok(out)
+}
+
+/// The fields of `records` by entity: kind → identifier → fields.
+fn group(records: &Records) -> HashMap<&str, BTreeMap<&str, Fields>> {
+    let mut entities: HashMap<&str, BTreeMap<&str, Fields>> = HashMap::new();
+    for ((entity, id, field), value) in records {
+        entities
+            .entry(entity.as_str()) // like `map[key]`, inserting if absent
+            .or_default()
+            .entry(id.as_str())
+            .or_default()
+            .insert(field.clone(), value.clone());
+    }
+    entities
+}
+
+/// Line `id` from its fields and its revisions, by date.
+fn decode_line(
+    id: &str,
+    fields: &Fields,
+    revisions: Option<&BTreeMap<Date, &Fields>>,
+    currency: Currency,
+) -> Result<Line, Corrupt> {
+    // A line whose revisions were all deleted can't be rebuilt.
+    let mut line_revisions = revisions.into_iter().flatten();
+    let Some((from, first)) = line_revisions.next() else {
+        return Err(Corrupt(format!("line {id} has no revision")));
+    };
+    let mut line = Line::new(
+        text(fields, "name")?,
+        text(fields, "category")?,
+        decode_kind(text(fields, "kind")?)?,
+        *from,
+        amount(first, currency)?,
+        decode_schedule(text(first, "schedule")?)?,
+    )
+    .map_err(|error| Corrupt(format!("line {id}: {error:?}")))?;
+    for (from, revision) in line_revisions {
+        line.change_from(
+            *from,
+            amount(revision, currency)?,
+            decode_schedule(text(revision, "schedule")?)?,
+        )
+        .map_err(|error| Corrupt(format!("line {id}: {error:?}")))?;
+    }
+    let ends_on = optional(fields, "ends_on").map(parse_date).transpose()?;
+    line.end_on(ends_on)
+        .map_err(|error| Corrupt(format!("line {id}: {error:?}")))?;
+    line.id = LineId(parse_uuid(id)?);
+    line.pot = optional(fields, "pot")
+        .map(|pot| parse_uuid(pot).map(PotId))
+        .transpose()?;
+    // Absent from lines written before lines had a payer: `None`.
+    line.payer = optional(fields, "payer").map(|member| MemberId(member.to_string()));
+    Ok(line)
+}
+
+/// Transaction `id` from its fields.
+fn decode_transaction(
+    id: &str,
+    fields: &Fields,
+    currency: Currency,
+) -> Result<Transaction, Corrupt> {
+    Ok(Transaction {
+        id: TransactionId(parse_uuid(id)?),
+        date: parse_date(text(fields, "date")?)?,
+        kind: decode_kind(text(fields, "kind")?)?,
+        amount: amount(fields, currency)?,
+        category: text(fields, "category")?.to_string(),
+        line: optional(fields, "line")
+            .map(|line| parse_uuid(line).map(LineId))
+            .transpose()?,
+        pot: optional(fields, "pot").map(decode_pot_move).transpose()?,
+        note: text(fields, "note")?.to_string(),
+        payer: optional(fields, "payer").map(|member| MemberId(member.to_string())),
+        payee: optional(fields, "payee").map(|member| MemberId(member.to_string())),
+    })
 }
 
 // The helpers below read one field, and encode or decode one value.

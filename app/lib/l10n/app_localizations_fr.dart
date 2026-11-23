@@ -441,4 +441,34 @@ class AppLocalizationsFr extends AppLocalizations {
   String exportedTo(String folder) {
     return 'Enregistré dans $folder';
   }
+
+  @override
+  String get removed => 'Supprimé';
+
+  @override
+  String get undo => 'Annuler';
+
+  @override
+  String get trash => 'Corbeille';
+
+  @override
+  String get trashEmpty => 'Rien de supprimé ces 30 derniers jours.';
+
+  @override
+  String get restore => 'Restaurer';
+
+  @override
+  String get restored => 'Restauré';
+
+  @override
+  String deletedOn(String date) {
+    return 'Supprimé le $date';
+  }
+
+  @override
+  String get emptyTrash => 'Vider la corbeille';
+
+  @override
+  String get emptyTrashQuestion =>
+      'Vider la corbeille ? Ce qu\'elle contient ne pourra plus être restauré.';
 }

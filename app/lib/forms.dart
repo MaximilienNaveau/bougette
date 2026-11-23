@@ -308,6 +308,7 @@ Future<bool> addTransaction(
   String budget,
   MonthView view, {
   TransactionRow? existing,
+  VoidCallback? onRestored,
 }) async {
   final amount = TextEditingController(
     text: existing == null ? '' : centsText(existing.amount),
@@ -444,7 +445,13 @@ Future<bool> addTransaction(
     },
   );
   if (remove && context.mounted) {
-    return removeTransaction(context, app, budget, existing!);
+    return removeTransaction(
+      context,
+      app,
+      budget,
+      existing!,
+      onRestored: onRestored,
+    );
   }
   return changed;
 }
@@ -455,17 +462,53 @@ Future<bool> removeTransaction(
   BuildContext context,
   App app,
   String budget,
-  TransactionRow transaction,
-) async {
+  TransactionRow transaction, {
+  VoidCallback? onRestored,
+}) async {
   final question = transaction.reflected
       ? context.words.removeThereToo(transaction.category)
       : context.words.removeTransactionQuestion;
   if (!await confirm(context, question) || !context.mounted) {
     return false;
   }
-  return guard(
+  final removed = await guard(
     context,
     () => app.removeTransaction(budget: budget, transaction: transaction.id),
+  );
+  if (removed && context.mounted) {
+    offerUndo(context, app, budget, transaction.id, onRestored);
+  }
+  return removed;
+}
+
+/// Says that something was removed, with a button to put item `item` back
+/// (from the trash), then calls `onRestored`.
+void offerUndo(
+  BuildContext context,
+  App app,
+  String budget,
+  String item,
+  VoidCallback? onRestored,
+) {
+  // The messenger outlives the screen (it belongs to the app), so the
+  // message can stay after a screen closes.
+  final messenger = ScaffoldMessenger.of(context);
+  final words = context.words;
+  messenger.showSnackBar(
+    SnackBar(
+      content: Text(words.removed),
+      action: SnackBarAction(
+        label: words.undo,
+        onPressed: () async {
+          try {
+            await app.restore(budget: budget, item: item);
+            onRestored?.call();
+          } catch (error) {
+            messenger.showSnackBar(SnackBar(content: Text('$error')));
+          }
+        },
+      ),
+    ),
   );
 }
 

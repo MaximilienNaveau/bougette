@@ -13,6 +13,7 @@ import 'look.dart';
 import 'members.dart';
 import 'month.dart';
 import 'src/rust/api.dart';
+import 'trash.dart';
 
 class BudgetScreen extends StatefulWidget {
   const BudgetScreen({super.key, required this.app, required this.budget});
@@ -101,6 +102,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
           currency: view.currency,
           pots: view.pots,
           destinations: view.destinations,
+          onRestored: _reload,
         ),
       ),
     );
@@ -126,6 +128,20 @@ class _BudgetScreenState extends State<BudgetScreen> {
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => MembersScreen(app: widget.app, budget: _budget),
+      ),
+    );
+    _reload();
+  }
+
+  /// What was deleted lately, to put back.
+  Future<void> _trash() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TrashScreen(
+          app: widget.app,
+          budget: _budget,
+          currency: widget.budget.currency,
+        ),
       ),
     );
     _reload();
@@ -165,6 +181,10 @@ class _BudgetScreenState extends State<BudgetScreen> {
                   PopupMenuItem(
                     value: _rename,
                     child: Text(context.words.rename),
+                  ),
+                  PopupMenuItem(
+                    value: _trash,
+                    child: Text(context.words.trash),
                   ),
                   CheckedPopupMenuItem(
                     value: _togglePersonal,
@@ -218,6 +238,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
                             _budget,
                             view,
                             existing: transaction,
+                            onRestored: _reload,
                           ),
                         ),
                         onAddPot: () => _then(addPot(context, app, _budget)),

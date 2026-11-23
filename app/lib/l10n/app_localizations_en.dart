@@ -440,4 +440,34 @@ class AppLocalizationsEn extends AppLocalizations {
   String exportedTo(String folder) {
     return 'Saved in $folder';
   }
+
+  @override
+  String get removed => 'Removed';
+
+  @override
+  String get undo => 'Undo';
+
+  @override
+  String get trash => 'Trash';
+
+  @override
+  String get trashEmpty => 'Nothing deleted in the last 30 days.';
+
+  @override
+  String get restore => 'Restore';
+
+  @override
+  String get restored => 'Restored';
+
+  @override
+  String deletedOn(String date) {
+    return 'Deleted on $date';
+  }
+
+  @override
+  String get emptyTrash => 'Empty the trash';
+
+  @override
+  String get emptyTrashQuestion =>
+      'Empty the trash? What is in it can\'t be restored afterwards.';
 }

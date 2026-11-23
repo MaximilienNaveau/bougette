@@ -8,8 +8,8 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `budgets_on`, `calendar_on`, `change`, `date`, `destinations`, `edit`, `export_on`, `holder_of_line`, `kind`, `line_home`, `load`, `lock`, `month_on`, `month_text`, `parse_id`, `parse_month`, `pot_move`, `repeat_of`, `schedule`, `sent`, `shown`, `source`, `status`, `stored`, `today`, `totals`, `with`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These functions are ignored because they are not marked as `pub`: `budgets_on`, `calendar_on`, `change`, `date`, `destinations`, `edit`, `export_on`, `holder_of_line`, `kind`, `line_home`, `load`, `lock`, `month_on`, `month_text`, `parse_id`, `parse_month`, `pot_move`, `repeat_of`, `schedule`, `sent`, `shown`, `source`, `status`, `stored`, `today`, `totals`, `trash_row`, `trash_since`, `with`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<App>>
 abstract class App implements RustOpaqueInterface {
@@ -99,6 +99,11 @@ abstract class App implements RustOpaqueInterface {
 
   /// The secret code that makes a new device one of this member's.
   Future<String> deviceCode();
+
+  /// Empties the trash of `budget` on this device: what was deleted
+  /// until now can no longer be restored here. (The deletions stay, as
+  /// every change does, for the other devices.)
+  Future<void> emptyTrash({required String budget});
 
   /// Line `line` stops after `last_day`, or goes on again with `None`.
   Future<void> endLine({
@@ -193,8 +198,6 @@ abstract class App implements RustOpaqueInterface {
     required String from,
   });
 
-  /// Removes transaction `transaction`: from the budget that holds it,
-  /// if it's seen here as a reflection.
   Future<void> removeTransaction({
     required String budget,
     required String transaction,
@@ -210,6 +213,13 @@ abstract class App implements RustOpaqueInterface {
     required String name,
     required String category,
   });
+
+  /// Puts line or transaction `item`, deleted in the last 30 days, back:
+  /// in `budget`, or in the budget it was deleted from if it's not
+  /// there (a contribution removed from a personal budget). Checked like
+  /// a new one: a transaction whose line is in the trash too waits for
+  /// its line.
+  Future<void> restore({required String budget, required String item});
 
   /// The server this device joined, if any.
   Future<ServerInfo?> server();
@@ -250,6 +260,12 @@ abstract class App implements RustOpaqueInterface {
 
   /// Syncs with the server. (Not `sync`: a keyword in Dart.)
   Future<SyncSummary> syncNow();
+
+  /// Removes transaction `transaction`: from the budget that holds it,
+  /// if it's seen here as a reflection.
+  /// What was deleted from `budget` in the last 30 days, the latest
+  /// first (doc/scope.md: Corbeille).
+  Future<List<TrashRow>> trash({required String budget});
 }
 
 /// Another budget, to choose where a line's money goes.
@@ -790,4 +806,64 @@ class TransactionRow {
           note == other.note &&
           pot == other.pot &&
           fromPot == other.fromPot;
+}
+
+/// A line or transaction deleted from a budget, restorable for 30 days.
+class TrashRow {
+  final String id;
+
+  /// A line, else a transaction.
+  final bool line;
+
+  /// `2026-11-20`: when it was deleted.
+  final String deletedOn;
+
+  /// A line's name, a transaction's category.
+  final String name;
+
+  /// A line's category, a transaction's note.
+  final String detail;
+
+  /// A transaction's date.
+  final String? date;
+  final bool income;
+
+  /// A transaction's amount, a line's latest.
+  final PlatformInt64 amount;
+
+  const TrashRow({
+    required this.id,
+    required this.line,
+    required this.deletedOn,
+    required this.name,
+    required this.detail,
+    this.date,
+    required this.income,
+    required this.amount,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      line.hashCode ^
+      deletedOn.hashCode ^
+      name.hashCode ^
+      detail.hashCode ^
+      date.hashCode ^
+      income.hashCode ^
+      amount.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TrashRow &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          line == other.line &&
+          deletedOn == other.deletedOn &&
+          name == other.name &&
+          detail == other.detail &&
+          date == other.date &&
+          income == other.income &&
+          amount == other.amount;
 }

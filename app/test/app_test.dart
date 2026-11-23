@@ -23,9 +23,10 @@ void main() {
   // Widget tests run on a fake clock, so real work (here, the Rust calls)
   // only progresses inside `runAsync`. Alternate: let it run, then move
   // the fake clock on (page transitions take 300 ms). Not `pumpAndSettle`:
-  // a loading spinner never settles.
+  // a loading spinner never settles. 20 rounds: enough for two Rust calls
+  // in a row (emptying the trash, then reading it) on a busy machine.
   Future<void> settle(WidgetTester tester) async {
-    for (var i = 0; i < 10; i++) {
+    for (var i = 0; i < 20; i++) {
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 50)),
       );
@@ -150,14 +151,48 @@ void main() {
     await settle(tester);
     expect(find.text('-€45.00'), findsWidgets);
 
-    // Opened again, removed.
-    await tester.tap(find.text('Courses · marché'));
+    // Opened again, removed, and put back with Undo.
+    Future<void> remove() async {
+      await tester.tap(find.text('Courses · marché'));
+      await settle(tester);
+      await tester.tap(find.text('Remove it'));
+      await settle(tester);
+      await tester.tap(find.text('Yes'));
+      await settle(tester);
+    }
+
+    await remove();
+    expect(find.text('Courses · marché'), findsNothing);
+    await tester.tap(find.text('Undo'));
     await settle(tester);
-    await tester.tap(find.text('Remove it'));
+    expect(find.text('Courses · marché'), findsOneWidget);
+
+    // Removed again, then put back from the trash.
+    await remove();
+    expect(find.text('Courses · marché'), findsNothing);
+    await tester.tap(find.byType(PopupMenuButton<VoidCallback>));
+    await settle(tester);
+    await tester.tap(find.text('Trash'));
+    await settle(tester);
+    expect(find.text('Courses · marché'), findsOneWidget);
+    await tester.tap(find.byTooltip('Restore'));
+    await settle(tester);
+    expect(find.text('Nothing deleted in the last 30 days.'), findsOneWidget);
+    await tester.pageBack();
+    await settle(tester);
+    expect(find.text('Courses · marché'), findsOneWidget);
+
+    // Removed for good: removed, then the trash emptied.
+    await remove();
+    await tester.tap(find.byType(PopupMenuButton<VoidCallback>));
+    await settle(tester);
+    await tester.tap(find.text('Trash'));
+    await settle(tester);
+    await tester.tap(find.byTooltip('Empty the trash'));
     await settle(tester);
     await tester.tap(find.text('Yes'));
     await settle(tester);
-    expect(find.text('Courses · marché'), findsNothing);
+    expect(find.text('Nothing deleted in the last 30 days.'), findsOneWidget);
   });
 
   testWidgets('a narrow window shows the whole year', (tester) async {

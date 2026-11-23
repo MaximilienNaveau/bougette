@@ -128,5 +128,14 @@
   "whereItGoes": "Où va son argent",
   "redirect": "L'envoyer ailleurs à partir d'une date…",
   "export": "Exporter",
-  "exportedTo": "Enregistré dans {folder}"
+  "exportedTo": "Enregistré dans {folder}",
+  "removed": "Supprimé",
+  "undo": "Annuler",
+  "trash": "Corbeille",
+  "trashEmpty": "Rien de supprimé ces 30 derniers jours.",
+  "restore": "Restaurer",
+  "restored": "Restauré",
+  "deletedOn": "Supprimé le {date}",
+  "emptyTrash": "Vider la corbeille",
+  "emptyTrashQuestion": "Vider la corbeille ? Ce qu'elle contient ne pourra plus être restauré."
 }

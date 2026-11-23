@@ -871,6 +871,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Saved in {folder}'**
   String exportedTo(String folder);
+
+  /// No description provided for @removed.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed'**
+  String get removed;
+
+  /// No description provided for @undo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get undo;
+
+  /// No description provided for @trash.
+  ///
+  /// In en, this message translates to:
+  /// **'Trash'**
+  String get trash;
+
+  /// No description provided for @trashEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing deleted in the last 30 days.'**
+  String get trashEmpty;
+
+  /// No description provided for @restore.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get restore;
+
+  /// No description provided for @restored.
+  ///
+  /// In en, this message translates to:
+  /// **'Restored'**
+  String get restored;
+
+  /// No description provided for @deletedOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted on {date}'**
+  String deletedOn(String date);
+
+  /// No description provided for @emptyTrash.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty the trash'**
+  String get emptyTrash;
+
+  /// No description provided for @emptyTrashQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty the trash? What is in it can\'t be restored afterwards.'**
+  String get emptyTrashQuestion;
 }
 
 class _AppLocalizationsDelegate

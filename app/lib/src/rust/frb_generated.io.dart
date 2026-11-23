@@ -116,6 +116,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<TransactionRow> dco_decode_list_transaction_row(dynamic raw);
 
   @protected
+  List<TrashRow> dco_decode_list_trash_row(dynamic raw);
+
+  @protected
   MemberRole dco_decode_member_role(dynamic raw);
 
   @protected
@@ -171,6 +174,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   TransactionRow dco_decode_transaction_row(dynamic raw);
+
+  @protected
+  TrashRow dco_decode_trash_row(dynamic raw);
 
   @protected
   int dco_decode_u_32(dynamic raw);
@@ -283,6 +289,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<TrashRow> sse_decode_list_trash_row(SseDeserializer deserializer);
+
+  @protected
   MemberRole sse_decode_member_role(SseDeserializer deserializer);
 
   @protected
@@ -344,6 +353,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   TransactionRow sse_decode_transaction_row(SseDeserializer deserializer);
+
+  @protected
+  TrashRow sse_decode_trash_row(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_32(SseDeserializer deserializer);
@@ -484,6 +496,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_trash_row(List<TrashRow> self, SseSerializer serializer);
+
+  @protected
   void sse_encode_member_role(MemberRole self, SseSerializer serializer);
 
   @protected
@@ -557,6 +572,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     TransactionRow self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_trash_row(TrashRow self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_32(int self, SseSerializer serializer);

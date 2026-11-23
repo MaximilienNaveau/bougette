@@ -32,7 +32,7 @@ pub mod crypto;
 mod members;
 mod message;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 
 use bougette_core::budget::Budget;
@@ -44,7 +44,7 @@ use uuid::Uuid;
 pub use crate::access::{Access, Role};
 use crate::clock::Clock;
 // `pub use` re-exports: users of this crate see `bougette_store::Corrupt`.
-pub use crate::codec::Corrupt;
+pub use crate::codec::{Corrupt, Trashed};
 use crate::codec::{DELETED, Records};
 use crate::crypto::Identity;
 pub use crate::members::{Invitation, MemberInfo};
@@ -396,6 +396,33 @@ impl Store {
     /// not readable by this device.
     pub fn load(&self, id: BudgetId) -> Result<Option<Budget>, StoreError> {
         Ok(codec::decode(&self.records(&id.to_string())?)?)
+    }
+
+    /// The lines and transactions of budget `budget` deleted at or after
+    /// `since` (milliseconds since 1970), most recent first, each with
+    /// when it was deleted (milliseconds). Restoring one is adding it back
+    /// to the budget and saving: only its deletion mark changes.
+    pub fn trash(&self, budget: BudgetId, since: u64) -> Result<Vec<(u64, Trashed)>, StoreError> {
+        let budget = budget.to_string();
+        let mut statement = self.connection.prepare(
+            "SELECT entity, id, timestamp FROM fields
+             WHERE budget = ?1 AND field = 'deleted' AND value = 'true'",
+        )?;
+        let rows = statement.query_map(params![budget], |row| {
+            Ok(((row.get(0)?, row.get(1)?), row.get(2)?))
+        })?;
+        // `collect` into a Result: the first error stops it, else the map.
+        let deleted_at: HashMap<(String, String), String> = rows.collect::<Result<_, _>>()?;
+        let trashed = codec::trashed(&self.records(&budget)?, &deleted_at)?;
+        Ok(trashed
+            .into_iter()
+            // A timestamp starts with its milliseconds (clock.rs);
+            // `filter_map` drops what fails to parse or is too old.
+            .filter_map(|(when, item)| {
+                let millis: u64 = when.get(..16)?.parse().ok()?;
+                (millis >= since).then_some((millis, item))
+            })
+            .collect())
     }
 
     /// `budget` as this member sees it: a personal budget also shows what
@@ -897,6 +924,57 @@ mod tests {
         store.save(&budget).unwrap();
         assert_eq!(message_count(&store), before + 1);
         assert_eq!(store.load(budget.id).unwrap(), Some(budget));
+    }
+
+    #[test]
+    fn deleted_lines_and_transactions_wait_in_the_trash() {
+        let mut store = Store::open_in_memory().unwrap();
+        let mut budget = store.create(sample()).unwrap();
+        assert!(store.trash(budget.id, 0).unwrap().is_empty());
+
+        // The bike savings: changed from March, then from February (which
+        // replaces March), then removed.
+        let savings = budget.lines()[1].clone();
+        let weekly = Schedule::Weekly {
+            first: date(2026, 1, 2),
+        };
+        budget
+            .change_line(savings.id, date(2026, 3, 1), eur(12000), weekly)
+            .unwrap();
+        store.save(&budget).unwrap();
+        budget
+            .change_line(savings.id, date(2026, 2, 1), eur(11000), weekly)
+            .unwrap();
+        store.save(&budget).unwrap();
+        budget.remove_line(savings.id).unwrap();
+        store.save(&budget).unwrap();
+        // Then January's rent payment.
+        let paid = budget.transactions()[0].clone();
+        budget.remove_transaction(paid.id).unwrap();
+        store.save(&budget).unwrap();
+
+        // Both in the trash, the latest first; the line as it was when
+        // removed: January and February, not the replaced March.
+        let trash = store.trash(budget.id, 0).unwrap();
+        assert_eq!(trash.len(), 2);
+        assert_eq!(trash[0].1, Trashed::Transaction(paid.clone()));
+        let Trashed::Line(line) = &trash[1].1 else {
+            panic!("not a line: {:?}", trash[1].1);
+        };
+        let froms: Vec<_> = line.revisions().iter().map(|r| r.from).collect();
+        assert_eq!(froms, [date(2026, 1, 1), date(2026, 2, 1)]);
+        assert!(trash[0].0 >= trash[1].0);
+        // Nothing deleted after a time in the future.
+        assert!(store.trash(budget.id, u64::MAX).unwrap().is_empty());
+
+        // Restored: added back and saved, as it was.
+        budget.add_line(line.clone()).unwrap();
+        budget.add_transaction(paid.clone()).unwrap();
+        store.save(&budget).unwrap();
+        let loaded = store.load(budget.id).unwrap().unwrap();
+        assert_eq!(loaded.line(savings.id), Some(line));
+        assert!(loaded.transactions().contains(&paid));
+        assert!(store.trash(budget.id, 0).unwrap().is_empty());
     }
 
     #[test]

@@ -270,5 +270,21 @@
         "type": "String"
       }
     }
-  }
+  },
+  "removed": "Removed",
+  "undo": "Undo",
+  "trash": "Trash",
+  "trashEmpty": "Nothing deleted in the last 30 days.",
+  "restore": "Restore",
+  "restored": "Restored",
+  "deletedOn": "Deleted on {date}",
+  "@deletedOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "emptyTrash": "Empty the trash",
+  "emptyTrashQuestion": "Empty the trash? What is in it can't be restored afterwards."
 }

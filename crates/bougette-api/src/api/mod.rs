@@ -16,7 +16,7 @@ use bougette_core::pot::{Goal, Pot};
 use bougette_core::schedule::Schedule;
 use bougette_core::transaction::PotMove;
 use bougette_core::transaction::Transaction;
-use bougette_store::{Store, StoreError};
+use bougette_store::{Store, StoreError, Trashed};
 use jiff::civil::Date;
 
 // Public: the generated bridge names its types by their path.
@@ -144,6 +144,25 @@ pub struct LineDetail {
 pub struct BudgetChoice {
     pub id: String,
     pub name: String,
+}
+
+/// A line or transaction deleted from a budget, restorable for 30 days.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TrashRow {
+    pub id: String,
+    /// A line, else a transaction.
+    pub line: bool,
+    /// `2026-11-20`: when it was deleted.
+    pub deleted_on: String,
+    /// A line's name, a transaction's category.
+    pub name: String,
+    /// A line's category, a transaction's note.
+    pub detail: String,
+    /// A transaction's date.
+    pub date: Option<String>,
+    pub income: bool,
+    /// A transaction's amount, a line's latest.
+    pub amount: i64,
 }
 
 /// A transaction in a month.
@@ -639,6 +658,91 @@ impl App {
 
     /// Removes transaction `transaction`: from the budget that holds it,
     /// if it's seen here as a reflection.
+    /// What was deleted from `budget` in the last 30 days, the latest
+    /// first (doc/scope.md: Corbeille).
+    pub fn trash(&self, budget: String) -> Result<Vec<TrashRow>, String> {
+        let id = BudgetId(
+            budget
+                .parse()
+                .map_err(|_| format!("not a budget: {budget}"))?,
+        );
+        let since = self.trash_since(&budget)?;
+        // In its own statement: the lock is released at the `;` (see
+        // `export_on`).
+        let trash = self.lock().trash(id, since).map_err(stored)?;
+        Ok(trash
+            .into_iter()
+            .map(|(when, item)| trash_row(when, item))
+            .collect())
+    }
+
+    /// Puts line or transaction `item`, deleted in the last 30 days, back:
+    /// in `budget`, or in the budget it was deleted from if it's not
+    /// there (a contribution removed from a personal budget). Checked like
+    /// a new one: a transaction whose line is in the trash too waits for
+    /// its line.
+    pub fn restore(&self, budget: String, item: String) -> Result<(), String> {
+        let ids = self.lock().budgets().map_err(stored)?;
+        // `budget` first, then the others: `partition` splits the list in
+        // two by a test, like `std::partition_copy`.
+        let (first, others): (Vec<_>, Vec<_>) = ids
+            .into_iter()
+            .partition(|(id, _)| id.to_string() == budget);
+        for (id, _) in first.into_iter().chain(others) {
+            let since = self.trash_since(&id.to_string())?;
+            let trash = self.lock().trash(id, since).map_err(stored)?;
+            let found = trash.into_iter().find_map(|(_, trashed)| {
+                let matches = match &trashed {
+                    Trashed::Line(line) => line.id.to_string() == item,
+                    Trashed::Transaction(transaction) => transaction.id.to_string() == item,
+                };
+                matches.then_some(trashed)
+            });
+            if let Some(trashed) = found {
+                return self.change(&id.to_string(), |budget| match trashed {
+                    Trashed::Line(line) => budget.add_line(line).map(|_| ()),
+                    Trashed::Transaction(transaction) => budget
+                        .add_transaction(transaction)
+                        .map(|_| ())
+                        .map_err(|error| {
+                            if error == BudgetError::UnknownLine {
+                                BudgetError::LineGone
+                            } else {
+                                error
+                            }
+                        }),
+                });
+            }
+        }
+        Err("it's no longer in the trash".into())
+    }
+
+    /// Empties the trash of `budget` on this device: what was deleted
+    /// until now can no longer be restored here. (The deletions stay, as
+    /// every change does, for the other devices.)
+    pub fn empty_trash(&self, budget: String) -> Result<(), String> {
+        let now = jiff::Timestamp::now().as_millisecond().to_string();
+        self.lock()
+            .set_setting(&format!("trash-emptied/{budget}"), &now)
+            .map_err(stored)
+    }
+
+    /// Since when deletions from `budget` can be restored (milliseconds):
+    /// the last 30 days, or since its trash was emptied.
+    fn trash_since(&self, budget: &str) -> Result<u64, String> {
+        let days = jiff::Timestamp::now().as_millisecond() - TRASH_DAYS * 86_400_000;
+        // In its own statement, as above: `self.lock()` lives until `;`.
+        let emptied = self
+            .lock()
+            .setting(&format!("trash-emptied/{budget}"))
+            .map_err(stored)?;
+        let emptied = emptied
+            .and_then(|millis| millis.parse::<i64>().ok())
+            .unwrap_or(0);
+        // The later of the two, never below zero.
+        Ok(u64::try_from(days.max(emptied)).unwrap_or(0))
+    }
+
     pub fn remove_transaction(&self, budget: String, transaction: String) -> Result<(), String> {
         let id = TransactionId(parse_id(&transaction)?);
         let held_here = self
@@ -1086,6 +1190,49 @@ fn kind(income: bool) -> Kind {
     if income { Kind::Income } else { Kind::Cost }
 }
 
+/// How long deleted lines and transactions can be restored.
+const TRASH_DAYS: i64 = 30;
+
+/// A trash entry as the app shows it, deleted at `when` (milliseconds).
+fn trash_row(when: u64, item: Trashed) -> TrashRow {
+    // The day of deletion where the user is.
+    let deleted_on = i64::try_from(when)
+        .ok()
+        .and_then(|millis| jiff::Timestamp::from_millisecond(millis).ok())
+        .map(|time| {
+            time.to_zoned(jiff::tz::TimeZone::system())
+                .date()
+                .to_string()
+        })
+        .unwrap_or_default();
+    match item {
+        Trashed::Line(line) => TrashRow {
+            id: line.id.to_string(),
+            line: true,
+            deleted_on,
+            date: None,
+            income: line.kind == Kind::Income,
+            // `last()` exists: a line has at least one revision.
+            amount: line
+                .revisions()
+                .last()
+                .map_or(0, |r| r.amount.minor_units()),
+            name: line.name,
+            detail: line.category,
+        },
+        Trashed::Transaction(transaction) => TrashRow {
+            id: transaction.id.to_string(),
+            line: false,
+            deleted_on,
+            date: Some(transaction.date.to_string()),
+            income: transaction.kind == Kind::Income,
+            amount: transaction.amount.minor_units(),
+            name: transaction.category,
+            detail: transaction.note,
+        },
+    }
+}
+
 fn today() -> Date {
     jiff::Zoned::now().date()
 }
@@ -1474,6 +1621,81 @@ mod tests {
         assert_eq!(there.line_id.as_deref(), Some(line.as_str()));
         assert_eq!(there.category, "Contributions");
         assert_eq!(row(&home, &transfer).amount, 12000);
+    }
+
+    #[test]
+    fn what_is_removed_waits_in_the_trash() {
+        let app = app();
+        let today = day(2026, 11, 16);
+        let id = app.create_budget("Flat".into(), "EUR".into()).unwrap();
+        let rent = app
+            .add_line(
+                id.clone(),
+                "Rent".into(),
+                "Rent".into(),
+                true,
+                50000,
+                Repeat::Monthly,
+                "2026-11-05".into(),
+                None,
+                None,
+            )
+            .unwrap();
+        let paid = app
+            .add_transaction(
+                id.clone(),
+                "2026-11-06".into(),
+                true,
+                50000,
+                "Rent".into(),
+                Some(rent.clone()),
+                "November".into(),
+                None,
+                false,
+            )
+            .unwrap();
+        assert!(app.trash(id.clone()).unwrap().is_empty());
+
+        // The payment, then the rent line, removed.
+        app.remove_transaction(id.clone(), paid.clone()).unwrap();
+        app.remove_line(id.clone(), rent.clone()).unwrap();
+        let trash = app.trash(id.clone()).unwrap();
+        assert_eq!(trash.len(), 2);
+        assert!(trash[0].line && trash[0].name == "Rent" && trash[0].amount == 50000);
+        assert!(!trash[1].line);
+        assert_eq!(
+            (trash[1].date.as_deref(), trash[1].detail.as_str()),
+            (Some("2026-11-06"), "November")
+        );
+        assert_eq!(trash[1].deleted_on, today_text());
+
+        // The payment can't come back before its line.
+        let refused = app.restore(id.clone(), paid.clone()).unwrap_err();
+        assert!(refused.contains("restore the line first"), "{refused}");
+        app.restore(id.clone(), rent.clone()).unwrap();
+        app.restore(id.clone(), paid.clone()).unwrap();
+        let month = app.month_on(&id, "2026-11", today).unwrap();
+        assert_eq!(month.lines[0].actual, 50000);
+        assert!(app.trash(id.clone()).unwrap().is_empty());
+        // Restored once only.
+        let again = app.restore(id.clone(), paid.clone()).unwrap_err();
+        assert!(again.contains("no longer in the trash"), "{again}");
+
+        // Emptied: what was deleted until then is gone for good, what is
+        // deleted after shows.
+        app.remove_transaction(id.clone(), paid.clone()).unwrap();
+        app.empty_trash(id.clone()).unwrap();
+        assert!(app.trash(id.clone()).unwrap().is_empty());
+        assert!(app.restore(id.clone(), paid).is_err());
+        // The clock moves on by at least a millisecond.
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        app.remove_line(id.clone(), rent).unwrap();
+        assert_eq!(app.trash(id).unwrap().len(), 1);
+    }
+
+    /// Today where the tests run, as `2026-11-20`.
+    fn today_text() -> String {
+        jiff::Zoned::now().date().to_string()
     }
 
     #[test]
