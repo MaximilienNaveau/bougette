@@ -14,6 +14,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'waiting.dart';
+
 void main() {
   final server = Platform.environment['BOUGETTE_SERVER'];
   late Directory folder;
@@ -56,15 +58,6 @@ void main() {
 
   tearDownAll(() => serving?.kill());
 
-  Future<void> settle(WidgetTester tester) async {
-    for (var i = 0; i < 20; i++) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 100)),
-      );
-      await tester.pump(const Duration(milliseconds: 100));
-    }
-  }
-
   testWidgets('join a server, create a budget, invite', (tester) async {
     tester.view.physicalSize = const Size(1600, 1200);
     tester.view.devicePixelRatio = 1;
@@ -75,16 +68,16 @@ void main() {
     await settle(tester);
 
     // The settings: a name, then the server.
-    await tester.tap(find.byTooltip('Settings'));
+    await tapSoon(tester, find.byTooltip('Settings'));
     await settle(tester);
-    await tester.tap(find.text('How the other members see you'));
+    await tapSoon(tester, find.text('How the other members see you'));
     await settle(tester);
     await tester.enterText(find.byType(TextField), 'Alice');
-    await tester.tap(find.text('OK'));
+    await tapSoon(tester, find.text('OK'));
     await settle(tester);
-    expect(find.text('Alice'), findsOneWidget);
+    await expectSoon(tester, find.text('Alice'), findsOneWidget);
 
-    await tester.tap(find.text('Join a server'));
+    await tapSoon(tester, find.text('Join a server'));
     await settle(tester);
     await tester.enterText(find.widgetWithText(TextField, 'Address'), address);
     await tester.enterText(
@@ -92,35 +85,35 @@ void main() {
       token,
     );
     await tester.enterText(find.widgetWithText(TextField, 'Username'), 'alice');
-    await tester.tap(find.text('OK'));
+    await tapSoon(tester, find.text('OK'));
     await settle(tester);
-    expect(find.textContaining('alice on'), findsOneWidget);
-    expect(find.text('Sync now'), findsOneWidget);
+    await expectSoon(tester, find.textContaining('alice on'), findsOneWidget);
+    await expectSoon(tester, find.text('Sync now'), findsOneWidget);
 
     // A budget, and its members: Alice alone, its Admin.
     await tester.pageBack();
     await settle(tester);
-    await tester.tap(find.text('Budget'));
+    await tapSoon(tester, find.text('Budget'));
     await settle(tester);
     await tester.enterText(find.byType(TextField), 'Maison');
-    await tester.tap(find.text('OK'));
+    await tapSoon(tester, find.text('OK'));
     await settle(tester);
-    await tester.tap(find.text('Maison'));
+    await tapSoon(tester, find.text('Maison'));
     await settle(tester);
-    await tester.tap(find.byType(PopupMenuButton<VoidCallback>));
+    await tapSoon(tester, find.byType(PopupMenuButton<VoidCallback>));
     await settle(tester);
-    await tester.tap(find.text('Members'));
+    await tapSoon(tester, find.text('Members'));
     await settle(tester);
-    expect(find.text('Alice (you)'), findsOneWidget);
-    expect(find.text('Admin'), findsOneWidget);
+    await expectSoon(tester, find.text('Alice (you)'), findsOneWidget);
+    await expectSoon(tester, find.text('Admin'), findsOneWidget);
 
     // An invitation, as an Editor for 7 days: its text names the server.
-    await tester.tap(find.text('Invite'));
+    await tapSoon(tester, find.text('Invite'));
     await settle(tester);
-    await tester.tap(find.text('Editor'));
+    await tapSoon(tester, find.text('Editor'));
     await settle(tester);
-    await tester.tap(find.text('OK'));
+    await tapSoon(tester, find.text('OK'));
     await settle(tester);
-    expect(find.textContaining('$address#'), findsOneWidget);
+    await expectSoon(tester, find.textContaining('$address#'), findsOneWidget);
   }, skip: server == null);
 }

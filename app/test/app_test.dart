@@ -11,6 +11,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'waiting.dart';
+
 void main() {
   setUpAll(() async {
     final library = Platform.environment['BOUGETTE_LIB'];
@@ -19,20 +21,6 @@ void main() {
     }
     await RustLib.init(externalLibrary: ExternalLibrary.open(library));
   });
-
-  // Widget tests run on a fake clock, so real work (here, the Rust calls)
-  // only progresses inside `runAsync`. Alternate: let it run, then move
-  // the fake clock on (page transitions take 300 ms). Not `pumpAndSettle`:
-  // a loading spinner never settles. 20 rounds: enough for two Rust calls
-  // in a row (emptying the trash, then reading it) on a busy machine.
-  Future<void> settle(WidgetTester tester) async {
-    for (var i = 0; i < 20; i++) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 50)),
-      );
-      await tester.pump(const Duration(milliseconds: 100));
-    }
-  }
 
   testWidgets('from the budgets to a month', (tester) async {
     // A wide window, so the tables fit.
@@ -58,62 +46,63 @@ void main() {
 
     await tester.pumpWidget(BougetteApp(app: app));
     await settle(tester);
-    expect(find.text('Maison'), findsOneWidget);
+    await expectSoon(tester, find.text('Maison'), findsOneWidget);
     // No income, 1,100 of rent a month; and the running balance is the
     // same, past months having no transaction (their actual is 0).
-    expect(
+    await expectSoon(
+      tester,
       find.text('Monthly -€1,100.00    Running -€1,100.00'),
       findsOneWidget,
     );
 
-    await tester.tap(find.text('Maison'));
+    await tapSoon(tester, find.text('Maison'));
     await settle(tester);
-    expect(find.text('January'), findsOneWidget);
-    expect(find.text('December'), findsOneWidget);
-    expect(find.text('forecast'), findsOneWidget);
+    await expectSoon(tester, find.text('January'), findsOneWidget);
+    await expectSoon(tester, find.text('December'), findsOneWidget);
+    await expectSoon(tester, find.text('forecast'), findsOneWidget);
 
-    await tester.tap(find.text('December'));
+    await tapSoon(tester, find.text('December'));
     await settle(tester);
-    expect(find.text('Loyer (Logement)'), findsOneWidget);
+    await expectSoon(tester, find.text('Loyer (Logement)'), findsOneWidget);
 
     // A pot, through its form.
-    await tester.tap(find.text('Add a pot'));
+    await tapSoon(tester, find.text('Add a pot'));
     await settle(tester);
     await tester.enterText(find.widgetWithText(TextField, 'Name'), 'Vélo');
     await tester.enterText(
       find.widgetWithText(TextField, 'Goal (optional)'),
       '1200',
     );
-    await tester.tap(find.text('OK'));
+    await tapSoon(tester, find.text('OK'));
     await settle(tester);
-    expect(find.text('Vélo'), findsOneWidget);
-    expect(find.text('goal €1,200.00'), findsOneWidget);
+    await expectSoon(tester, find.text('Vélo'), findsOneWidget);
+    await expectSoon(tester, find.text('goal €1,200.00'), findsOneWidget);
 
     // The rent in full: its amounts as a table, a change added to it.
-    await tester.tap(find.text('Loyer (Logement)'));
+    await tapSoon(tester, find.text('Loyer (Logement)'));
     await settle(tester);
-    expect(find.text('Start'), findsOneWidget);
-    expect(find.text('€1,100.00'), findsOneWidget);
-    await tester.tap(find.text('Add a change'));
+    await expectSoon(tester, find.text('Start'), findsOneWidget);
+    await expectSoon(tester, find.text('€1,100.00'), findsOneWidget);
+    await tapSoon(tester, find.text('Add a change'));
     await settle(tester);
     await tester.enterText(find.widgetWithText(TextField, 'Amount'), '1200');
-    await tester.tap(find.text('OK'));
+    await tapSoon(tester, find.text('OK'));
     await settle(tester);
-    expect(find.text('Change 1'), findsOneWidget);
-    expect(find.text('€1,200.00'), findsOneWidget);
+    await expectSoon(tester, find.text('Change 1'), findsOneWidget);
+    await expectSoon(tester, find.text('€1,200.00'), findsOneWidget);
     // Removed again from the table (the start has a button too).
-    await tester.tap(find.byTooltip('Remove this change').last);
+    await tapSoon(tester, find.byTooltip('Remove this change').last);
     await settle(tester);
-    await tester.tap(find.text('Yes'));
+    await tapSoon(tester, find.text('Yes'));
     await settle(tester);
-    expect(find.text('Change 1'), findsNothing);
+    await expectSoon(tester, find.text('Change 1'), findsNothing);
 
     // The rent has no transaction: it can be removed.
-    await tester.tap(find.byTooltip('Remove it'));
+    await tapSoon(tester, find.byTooltip('Remove it'));
     await settle(tester);
-    await tester.tap(find.text('Yes'));
+    await tapSoon(tester, find.text('Yes'));
     await settle(tester);
-    expect(find.text('Loyer (Logement)'), findsNothing);
+    await expectSoon(tester, find.text('Loyer (Logement)'), findsNothing);
   });
 
   testWidgets('a transaction is changed, then removed', (tester) async {
@@ -139,60 +128,72 @@ void main() {
     }))!;
     await tester.pumpWidget(BougetteApp(app: app));
     await settle(tester);
-    await tester.tap(find.text('Maison'));
+    await tapSoon(tester, find.text('Maison'));
     await settle(tester);
 
     // Opened with what it holds; 42 becomes 45.
-    await tester.tap(find.text('Courses · marché'));
+    await tapSoon(tester, find.text('Courses · marché'));
     await settle(tester);
-    expect(find.text('Change the transaction'), findsOneWidget);
+    await expectSoon(
+      tester,
+      find.text('Change the transaction'),
+      findsOneWidget,
+    );
     await tester.enterText(find.widgetWithText(TextField, '42.00'), '45');
-    await tester.tap(find.text('OK'));
+    await tapSoon(tester, find.text('OK'));
     await settle(tester);
-    expect(find.text('-€45.00'), findsWidgets);
+    await expectSoon(tester, find.text('-€45.00'), findsWidgets);
 
     // Opened again, removed, and put back with Undo.
     Future<void> remove() async {
-      await tester.tap(find.text('Courses · marché'));
+      await tapSoon(tester, find.text('Courses · marché'));
       await settle(tester);
-      await tester.tap(find.text('Remove it'));
+      await tapSoon(tester, find.text('Remove it'));
       await settle(tester);
-      await tester.tap(find.text('Yes'));
+      await tapSoon(tester, find.text('Yes'));
       await settle(tester);
     }
 
     await remove();
-    expect(find.text('Courses · marché'), findsNothing);
-    await tester.tap(find.text('Undo'));
+    await expectSoon(tester, find.text('Courses · marché'), findsNothing);
+    await tapSoon(tester, find.text('Undo'));
     await settle(tester);
-    expect(find.text('Courses · marché'), findsOneWidget);
+    await expectSoon(tester, find.text('Courses · marché'), findsOneWidget);
 
     // Removed again, then put back from the trash.
     await remove();
-    expect(find.text('Courses · marché'), findsNothing);
-    await tester.tap(find.byType(PopupMenuButton<VoidCallback>));
+    await expectSoon(tester, find.text('Courses · marché'), findsNothing);
+    await tapSoon(tester, find.byType(PopupMenuButton<VoidCallback>));
     await settle(tester);
-    await tester.tap(find.text('Trash'));
+    await tapSoon(tester, find.text('Trash'));
     await settle(tester);
-    expect(find.text('Courses · marché'), findsOneWidget);
-    await tester.tap(find.byTooltip('Restore'));
+    await expectSoon(tester, find.text('Courses · marché'), findsOneWidget);
+    await tapSoon(tester, find.byTooltip('Restore'));
     await settle(tester);
-    expect(find.text('Nothing deleted in the last 30 days.'), findsOneWidget);
+    await expectSoon(
+      tester,
+      find.text('Nothing deleted in the last 30 days.'),
+      findsOneWidget,
+    );
     await tester.pageBack();
     await settle(tester);
-    expect(find.text('Courses · marché'), findsOneWidget);
+    await expectSoon(tester, find.text('Courses · marché'), findsOneWidget);
 
     // Removed for good: removed, then the trash emptied.
     await remove();
-    await tester.tap(find.byType(PopupMenuButton<VoidCallback>));
+    await tapSoon(tester, find.byType(PopupMenuButton<VoidCallback>));
     await settle(tester);
-    await tester.tap(find.text('Trash'));
+    await tapSoon(tester, find.text('Trash'));
     await settle(tester);
-    await tester.tap(find.byTooltip('Empty the trash'));
+    await tapSoon(tester, find.byTooltip('Empty the trash'));
     await settle(tester);
-    await tester.tap(find.text('Yes'));
+    await tapSoon(tester, find.text('Yes'));
     await settle(tester);
-    expect(find.text('Nothing deleted in the last 30 days.'), findsOneWidget);
+    await expectSoon(
+      tester,
+      find.text('Nothing deleted in the last 30 days.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('a narrow window shows the whole year', (tester) async {
@@ -208,10 +209,15 @@ void main() {
       tester.view.devicePixelRatio = 1;
       await tester.pumpWidget(BougetteApp(app: app));
       await settle(tester);
-      await tester.tap(find.text('Maison'));
+      await tapSoon(tester, find.text('Maison'));
       await settle(tester);
       for (final month in ['January', 'June', 'December']) {
-        expect(find.text(month).hitTestable(), findsOneWidget, reason: month);
+        await expectSoon(
+          tester,
+          find.text(month).hitTestable(),
+          findsOneWidget,
+          reason: month,
+        );
       }
       // Empty: no year before this one to go to; the next one, named.
       final year = DateTime.now().year;
@@ -220,9 +226,9 @@ void main() {
         matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
       );
       expect(tester.widget<ButtonStyleButton>(back).enabled, isFalse);
-      await tester.tap(find.text('${year + 1}'));
+      await tapSoon(tester, find.text('${year + 1}'));
       await settle(tester);
-      expect(find.text('${year + 2}'), findsOneWidget);
+      await expectSoon(tester, find.text('${year + 2}'), findsOneWidget);
       expect(tester.widget<ButtonStyleButton>(back).enabled, isTrue);
       await tester.pageBack();
       await settle(tester);
@@ -244,9 +250,9 @@ void main() {
     await settle(tester);
 
     // From the personal budget, 100 a month to the flat's budget.
-    await tester.tap(find.text('Maison'));
+    await tapSoon(tester, find.text('Maison'));
     await settle(tester);
-    await tester.tap(find.byTooltip('Add a line'));
+    await tapSoon(tester, find.byTooltip('Add a line'));
     await settle(tester);
     await tester.enterText(find.widgetWithText(TextField, 'Name'), 'Appart');
     await tester.enterText(
@@ -254,50 +260,62 @@ void main() {
       'Apport',
     );
     await tester.enterText(find.widgetWithText(TextField, 'Amount'), '100');
-    await tester.tap(find.text('Feeds no pot'));
+    await tapSoon(tester, find.text('Feeds no pot'));
     await settle(tester);
     // The open menu draws its items again: tap the last one.
-    await tester.tap(find.text('Goes to the Appartement budget').last);
+    await tapSoon(tester, find.text('Goes to the Appartement budget').last);
     await settle(tester);
-    await tester.tap(find.text('OK'));
+    await tapSoon(tester, find.text('OK'));
     await settle(tester);
     // Here, a cost in the category named after the other budget.
-    expect(find.text('Appart (Appartement)'), findsOneWidget);
-    expect(find.byTooltip('from another budget'), findsOneWidget);
+    await expectSoon(tester, find.text('Appart (Appartement)'), findsOneWidget);
+    await expectSoon(
+      tester,
+      find.byTooltip('from another budget'),
+      findsOneWidget,
+    );
 
     // There, an income in the category typed.
     await tester.pageBack();
     await settle(tester);
-    await tester.tap(find.text('Appartement'));
+    await tapSoon(tester, find.text('Appartement'));
     await settle(tester);
-    expect(find.text('Appart (Apport)'), findsOneWidget);
-    expect(find.byTooltip('from another budget'), findsNothing);
+    await expectSoon(tester, find.text('Appart (Apport)'), findsOneWidget);
+    await expectSoon(
+      tester,
+      find.byTooltip('from another budget'),
+      findsNothing,
+    );
 
     // From the personal budget again, redirected from today (its start):
     // all of it stays home, as a plain cost.
     await tester.pageBack();
     await settle(tester);
-    await tester.tap(find.text('Maison'));
+    await tapSoon(tester, find.text('Maison'));
     await settle(tester);
-    await tester.tap(find.text('Appart (Appartement)'));
+    await tapSoon(tester, find.text('Appart (Appartement)'));
     await settle(tester);
-    await tester.tap(find.text('Goes to the Appartement budget'));
+    await tapSoon(tester, find.text('Goes to the Appartement budget'));
     await settle(tester);
     // The form's choice, drawn over the screen's tile: the last one.
-    await tester.tap(find.text('Goes to the Appartement budget').last);
+    await tapSoon(tester, find.text('Goes to the Appartement budget').last);
     await settle(tester);
-    await tester.tap(find.text('Feeds no pot').last);
+    await tapSoon(tester, find.text('Feeds no pot').last);
     await settle(tester);
-    await tester.tap(find.text('OK'));
+    await tapSoon(tester, find.text('OK'));
     await settle(tester);
     // Back on the month: home's own line now, in the category typed.
-    expect(find.text('Appart (Apport)'), findsOneWidget);
-    expect(find.byTooltip('from another budget'), findsNothing);
+    await expectSoon(tester, find.text('Appart (Apport)'), findsOneWidget);
+    await expectSoon(
+      tester,
+      find.byTooltip('from another budget'),
+      findsNothing,
+    );
     await tester.pageBack();
     await settle(tester);
-    await tester.tap(find.text('Appartement'));
+    await tapSoon(tester, find.text('Appartement'));
     await settle(tester);
-    expect(find.text('Appart (Apport)'), findsNothing);
+    await expectSoon(tester, find.text('Appart (Apport)'), findsNothing);
   });
 
   testWidgets('in French', (tester) async {
@@ -322,13 +340,17 @@ void main() {
     }))!;
     await tester.pumpWidget(BougetteApp(app: app));
     await settle(tester);
-    expect(find.text('Mes budgets'), findsOneWidget);
+    await expectSoon(tester, find.text('Mes budgets'), findsOneWidget);
     // A decimal comma, a narrow no-break space between thousands, and the
     // symbol after the amount.
-    expect(find.textContaining('1\u202f234,56\u00a0€'), findsOneWidget);
-    await tester.tap(find.text('Maison'));
+    await expectSoon(
+      tester,
+      find.textContaining('1\u202f234,56\u00a0€'),
+      findsOneWidget,
+    );
+    await tapSoon(tester, find.text('Maison'));
     await settle(tester);
-    expect(find.text('janvier'), findsOneWidget);
-    expect(find.text('projection'), findsOneWidget);
+    await expectSoon(tester, find.text('janvier'), findsOneWidget);
+    await expectSoon(tester, find.text('projection'), findsOneWidget);
   });
 }

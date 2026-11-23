@@ -17,7 +17,7 @@ Future<void> _round(WidgetTester tester) async {
 /// takes 300 ms). Not `pumpAndSettle`: a loading spinner never settles.
 /// The checks after it wait for the Rust results themselves (`expectSoon`).
 Future<void> settle(WidgetTester tester) async {
-  for (var i = 0; i < 5; i++) {
+  for (var i = 0; i < 10; i++) {
     await _round(tester);
   }
 }
@@ -33,10 +33,17 @@ Future<void> expectSoon(
 }) async {
   for (var i = 0; i < 100; i++) {
     // `matches` is what `expect` checks, without failing.
-    if (matcher.matches(finder, <dynamic, dynamic>{})) break;
+    if (matcher.matches(finder, <dynamic, dynamic>{})) return;
     await _round(tester);
   }
-  expect(finder, matcher, reason: reason);
+  // Still not: fail, saying what the screen shows, to see why.
+  final shown = find
+      .byType(Text)
+      .evaluate()
+      .map((element) => (element.widget as Text).data)
+      .whereType<String>()
+      .join(' | ');
+  expect(finder, matcher, reason: '${reason ?? ''} (shown: $shown)');
 }
 
 /// Taps `finder` once it finds something to tap (see `expectSoon`).
