@@ -21,7 +21,7 @@ iroh = { version = "1.4", default-features = false, features = ["tls-ring"] }
 # Dates, plus the system time zone to know today's date where the user is:
 # "tz-system" finds the zone, "tzdb-zoneinfo" reads its rules from
 # /usr/share/zoneinfo. No time zone data is bundled.
-jiff = { version = "0.2", default-features = false, features = [
+jiff = { version = "1.0", default-features = false, features = [
     "std",
     "tz-system",
     "tzdb-zoneinfo",
