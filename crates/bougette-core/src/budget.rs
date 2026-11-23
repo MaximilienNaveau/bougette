@@ -67,6 +67,18 @@ pub struct Comparison {
     pub actual: Money,
 }
 
+/// One category over a year (see `Budget::year_by_category`), amounts
+/// counted positive in the direction of `kind`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CategoryYear {
+    pub kind: Kind,
+    pub category: String,
+    pub planned: Money,
+    pub actual: Money,
+    /// The expected total at the end of the year (GLOSSARY.md: Forecast).
+    pub forecast: Money,
+}
+
 /// How a cost compares with its plan: the colour shown (doc/scope.md).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Status {
@@ -488,22 +500,99 @@ impl Budget {
 
     /// The plan of `month`: total incomes and total costs of the lines.
     pub fn plan(&self, month: Month, view: View) -> MonthTotals {
+        // `|_, _| true`: a closure (a lambda) keeping every category.
+        self.plan_of(month, view, &|_, _| true)
+    }
+
+    /// The actual of `month`: total incomes and costs of its transactions.
+    pub fn actual(&self, month: Month) -> MonthTotals {
+        self.actual_of(month, &|_, _| true)
+    }
+
+    /// The plan of `month` for the lines `keep` accepts, given their kind
+    /// and category.
+    // `&impl Fn(Kind, &str) -> bool`: a reference to any callable taking
+    // a kind and a category, like a template parameter `const F& keep`;
+    // each closure type gets its own compiled copy, as with templates.
+    fn plan_of(&self, month: Month, view: View, keep: &impl Fn(Kind, &str) -> bool) -> MonthTotals {
         // `mut`: Rust variables are immutable (const) unless declared `mut`.
         let mut totals = MonthTotals::zero(self.currency);
         // `for x in &v` iterates by reference, like `for (const auto& x : v)`.
-        for line in &self.lines {
+        for line in self
+            .lines
+            .iter()
+            .filter(|line| keep(line.kind, &line.category))
+        {
             totals.add(line.kind, line.amount_in(month, view));
         }
         totals
     }
 
-    /// The actual of `month`: total incomes and costs of its transactions.
-    pub fn actual(&self, month: Month) -> MonthTotals {
+    /// The actual of `month` for the transactions `keep` accepts.
+    fn actual_of(&self, month: Month, keep: &impl Fn(Kind, &str) -> bool) -> MonthTotals {
         let mut totals = MonthTotals::zero(self.currency);
-        for transaction in self.transactions_in(month) {
+        for transaction in self
+            .transactions_in(month)
+            .filter(|t| keep(t.kind, &t.category))
+        {
             totals.add(transaction.kind, transaction.amount);
         }
         totals
+    }
+
+    /// Each category of `year`, seen from `today`: what was planned for
+    /// the whole year, what actually happened, and the forecast (the
+    /// actual of past months, the plan of the coming ones, see
+    /// `forecast`). Incomes first, then costs, each by category name;
+    /// categories with nothing in the year are left out.
+    pub fn year_by_category(&self, year: i16, today: Date) -> Vec<CategoryYear> {
+        // The (kind, category) pairs of the lines and transactions, sorted
+        // and without duplicates: a BTreeSet is a `std::set`. Incomes sort
+        // first because `Kind::Income` is declared before `Kind::Cost`.
+        let categories: std::collections::BTreeSet<(Kind, &str)> = self
+            .lines
+            .iter()
+            .map(|line| (line.kind, line.category.as_str()))
+            .chain(
+                self.transactions
+                    .iter()
+                    .map(|t| (t.kind, t.category.as_str())),
+            )
+            .collect();
+        let mut rows = Vec::new();
+        for (kind, category) in categories {
+            let keep = |k: Kind, c: &str| k == kind && c == category;
+            let zero = Money::zero(self.currency);
+            let mut row = CategoryYear {
+                kind,
+                category: category.to_string(),
+                planned: zero,
+                actual: zero,
+                forecast: zero,
+            };
+            // `1..=12`: from 1 to 12 included.
+            for number in 1..=12 {
+                // `let ... else`: skip a year jiff can't represent.
+                let Some(month) = Month::new(year, number) else {
+                    continue;
+                };
+                // `.incomes` or `.costs`: the side of this kind.
+                let side = |totals: MonthTotals| match kind {
+                    Kind::Income => totals.incomes,
+                    Kind::Cost => totals.costs,
+                };
+                row.planned += side(self.plan_of(month, View::Due, &keep));
+                row.actual += side(self.actual_of(month, &keep));
+                row.forecast += side(self.forecast_of(month, today, &keep));
+            }
+            if [row.planned, row.actual, row.forecast]
+                .iter()
+                .any(|amount| amount.minor_units() != 0)
+            {
+                rows.push(row);
+            }
+        }
+        rows
     }
 
     /// A line's plan and actual over `month`, or `None` for an unknown line.
@@ -544,15 +633,30 @@ impl Budget {
     ///   planned and what already happened, plus the unplanned
     ///   transactions.
     pub fn forecast(&self, month: Month, today: Date) -> MonthTotals {
+        self.forecast_of(month, today, &|_, _| true)
+    }
+
+    /// The forecast of `month` for the lines and transactions `keep`
+    /// accepts.
+    fn forecast_of(
+        &self,
+        month: Month,
+        today: Date,
+        keep: &impl Fn(Kind, &str) -> bool,
+    ) -> MonthTotals {
         let current = Month::of(today);
         if month < current {
-            return self.actual(month);
+            return self.actual_of(month, keep);
         }
         if month > current {
-            return self.plan(month, View::Due);
+            return self.plan_of(month, View::Due, keep);
         }
         let mut totals = MonthTotals::zero(self.currency);
-        for line in &self.lines {
+        for line in self
+            .lines
+            .iter()
+            .filter(|line| keep(line.kind, &line.category))
+        {
             let planned = line.amount_in(month, View::Due);
             let actual = self.line_actual(line.id, month);
             // Groceries: €250 spent of €600 planned still forecasts €600;
@@ -565,7 +669,7 @@ impl Budget {
             totals.add(line.kind, expected);
         }
         for transaction in self.transactions_in(month) {
-            if transaction.line.is_none() {
+            if transaction.line.is_none() && keep(transaction.kind, &transaction.category) {
                 totals.add(transaction.kind, transaction.amount);
             }
         }
@@ -804,6 +908,77 @@ mod tests {
             .unwrap();
         let april = budget.compare_line(groceries, month(2026, 4)).unwrap();
         assert_eq!(april.actual, eur(15000));
+    }
+
+    #[test]
+    fn a_year_by_category_is_planned_actual_and_forecast() {
+        let (mut budget, rent, groceries) = household();
+        let today = date(2026, 4, 15);
+        for m in 1..=3 {
+            budget
+                .add_transaction(cost(date(2026, m, 5), 90000, "Housing", Some(rent)))
+                .unwrap();
+        }
+        budget
+            .add_transaction(cost(date(2026, 1, 20), 70000, "Food", Some(groceries)))
+            .unwrap();
+        // A restaurant in February, unplanned; groceries not entered then.
+        budget
+            .add_transaction(cost(date(2026, 2, 14), 10000, "Food", None))
+            .unwrap();
+        budget
+            .add_transaction(cost(date(2026, 4, 3), 25000, "Food", Some(groceries)))
+            .unwrap();
+
+        let rows = budget.year_by_category(2026, today);
+        // `(kind, &str, planned, actual, forecast)` for each row.
+        let found: Vec<_> = rows
+            .iter()
+            .map(|row| {
+                (
+                    row.kind,
+                    row.category.as_str(),
+                    row.planned,
+                    row.actual,
+                    row.forecast,
+                )
+            })
+            .collect();
+        assert_eq!(
+            found,
+            vec![
+                // Nothing received yet: April's plan counts (the current
+                // month), then the eight months after it.
+                (
+                    Kind::Income,
+                    "Contributions",
+                    eur(3_000_000),
+                    eur(0),
+                    eur(9 * 250000)
+                ),
+                // Electricity in January and March, not entered: the
+                // forecast keeps May, July, September and November.
+                (Kind::Cost, "Energy", eur(6 * 12000), eur(0), eur(4 * 12000)),
+                // January, February, March as they were, April's plan
+                // (more than the €250 so far), then eight months of plan.
+                (
+                    Kind::Cost,
+                    "Food",
+                    eur(12 * 60000),
+                    eur(70000 + 10000 + 25000),
+                    eur(70000 + 10000 + 60000 + 8 * 60000)
+                ),
+                // The insurance of March was never paid: gone from the
+                // forecast, which follows what happened.
+                (
+                    Kind::Cost,
+                    "Housing",
+                    eur(12 * 90000 + 48000),
+                    eur(3 * 90000),
+                    eur(12 * 90000)
+                ),
+            ]
+        );
     }
 
     #[test]

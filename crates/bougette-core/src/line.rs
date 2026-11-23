@@ -8,7 +8,8 @@ use crate::month::Month;
 use crate::schedule::{Period, Schedule};
 
 /// Whether a line, or a transaction, brings money in or takes it out.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Ordered as declared (`PartialOrd, Ord`): incomes sort before costs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Kind {
     Income,
     Cost,

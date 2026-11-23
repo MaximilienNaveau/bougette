@@ -28,7 +28,9 @@ Budgets
   budget personal BUDGET           yours: your contributions, advances and
                                    repayments in shared budgets show in it
   show BUDGET [MONTH]              a month: plan, actual, forecast, pots
-  year BUDGET [YEAR]               the balances, month by month
+  year BUDGET [YEAR]               the balances, month by month, and the
+                                   year by category: planned, actual,
+                                   forecast
   export [FOLDER]                  every budget as JSON, and the transactions
                                    as CSV, into FOLDER (here by default)
 
@@ -527,7 +529,7 @@ fn show(context: &mut Context, name: &str, month: Option<&str>) -> Result<String
 
 /// The twelve months of a year: the planned monthly balance, the expected
 /// one (actual, forecast or plan, depending on the month) and the running
-/// balance.
+/// balance, then the whole year by category.
 fn year(context: &mut Context, name: &str, year: Option<&str>) -> Result<String, String> {
     let budget = find_budget(context.store, name)?;
     let budget = stored(context.store.shown(budget))?;
@@ -578,6 +580,44 @@ fn year(context: &mut Context, name: &str, year: Option<&str>) -> Result<String,
         );
         month = month.next();
     }
+    // The whole year by category: costs shown negative, so each column
+    // adds up to the year's balance.
+    out += &format!(
+        "\nBy category{:<25}{:>11}{:>11}{:>11}\n",
+        "", "planned", "actual", "forecast"
+    );
+    let zero = Money::zero(budget.currency());
+    let (mut planned, mut actual, mut forecast) = (zero, zero, zero);
+    for row in budget.year_by_category(year, context.today) {
+        // A closure giving an amount its sign: `-` for a cost.
+        let signed = |amount: Money| match row.kind {
+            Kind::Income => amount,
+            Kind::Cost => zero - amount,
+        };
+        planned += signed(row.planned);
+        actual += signed(row.actual);
+        forecast += signed(row.forecast);
+        // A line can be left without a category.
+        let category = if row.category.is_empty() {
+            "(none)"
+        } else {
+            &row.category
+        };
+        out += &format!(
+            "  {:<34}{:>11}{:>11}{:>11}\n",
+            category,
+            amount(signed(row.planned)),
+            amount(signed(row.actual)),
+            amount(signed(row.forecast))
+        );
+    }
+    out += &format!(
+        "  {:<34}{:>11}{:>11}{:>11}\n",
+        "Balance",
+        amount(planned),
+        amount(actual),
+        amount(forecast)
+    );
     Ok(out)
 }
 
