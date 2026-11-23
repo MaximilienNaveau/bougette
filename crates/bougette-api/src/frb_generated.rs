@@ -40,7 +40,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1813226342;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 298319008;
 
 // Section: executor
 
@@ -2252,6 +2252,57 @@ fn wire__crate__api__App_trash_impl(
         },
     )
 }
+fn wire__crate__api__App_year_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "App_year",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<App>,
+            >>::sse_decode(&mut deserializer);
+            let api_budget = <String>::sse_decode(&mut deserializer);
+            let api_year = <i16>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let mut api_that_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_that, 0, false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_that_guard = api_that_guard.unwrap();
+                    let output_ok = crate::api::App::year(&*api_that_guard, api_budget, api_year)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 
 // Section: related_funcs
 
@@ -2320,6 +2371,24 @@ impl SseDecode for crate::api::BudgetSummary {
             monthly_balance: var_monthlyBalance,
             running_balance: var_runningBalance,
             personal: var_personal,
+        };
+    }
+}
+
+impl SseDecode for crate::api::CategoryRow {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_category = <String>::sse_decode(deserializer);
+        let mut var_income = <bool>::sse_decode(deserializer);
+        let mut var_planned = <i64>::sse_decode(deserializer);
+        let mut var_actual = <i64>::sse_decode(deserializer);
+        let mut var_forecast = <i64>::sse_decode(deserializer);
+        return crate::api::CategoryRow {
+            category: var_category,
+            income: var_income,
+            planned: var_planned,
+            actual: var_actual,
+            forecast: var_forecast,
         };
     }
 }
@@ -2434,6 +2503,18 @@ impl SseDecode for Vec<crate::api::BudgetSummary> {
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
             ans_.push(<crate::api::BudgetSummary>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::CategoryRow> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::CategoryRow>::sse_decode(deserializer));
         }
         return ans_;
     }
@@ -2880,6 +2961,22 @@ impl SseDecode for usize {
     }
 }
 
+impl SseDecode for crate::api::YearView {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_categories = <Vec<crate::api::CategoryRow>>::sse_decode(deserializer);
+        let mut var_planned = <crate::api::Totals>::sse_decode(deserializer);
+        let mut var_actual = <crate::api::Totals>::sse_decode(deserializer);
+        let mut var_forecast = <crate::api::Totals>::sse_decode(deserializer);
+        return crate::api::YearView {
+            categories: var_categories,
+            planned: var_planned,
+            actual: var_actual,
+            forecast: var_forecast,
+        };
+    }
+}
+
 fn pde_ffi_dispatcher_primary_impl(
     func_id: i32,
     port: flutter_rust_bridge::for_generated::MessagePort,
@@ -2930,6 +3027,7 @@ fn pde_ffi_dispatcher_primary_impl(
         39 => wire__crate__api__App_set_up_recovery_impl(port, ptr, rust_vec_len, data_len),
         40 => wire__crate__api__App_sync_now_impl(port, ptr, rust_vec_len, data_len),
         41 => wire__crate__api__App_trash_impl(port, ptr, rust_vec_len, data_len),
+        42 => wire__crate__api__App_year_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2996,6 +3094,25 @@ impl flutter_rust_bridge::IntoDart for crate::api::BudgetSummary {
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::BudgetSummary {}
 impl flutter_rust_bridge::IntoIntoDart<crate::api::BudgetSummary> for crate::api::BudgetSummary {
     fn into_into_dart(self) -> crate::api::BudgetSummary {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::CategoryRow {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.category.into_into_dart().into_dart(),
+            self.income.into_into_dart().into_dart(),
+            self.planned.into_into_dart().into_dart(),
+            self.actual.into_into_dart().into_dart(),
+            self.forecast.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::CategoryRow {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::CategoryRow> for crate::api::CategoryRow {
+    fn into_into_dart(self) -> crate::api::CategoryRow {
         self
     }
 }
@@ -3338,6 +3455,24 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::TrashRow> for crate::api::Tra
         self
     }
 }
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::YearView {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.categories.into_into_dart().into_dart(),
+            self.planned.into_into_dart().into_dart(),
+            self.actual.into_into_dart().into_dart(),
+            self.forecast.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::YearView {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::YearView> for crate::api::YearView {
+    fn into_into_dart(self) -> crate::api::YearView {
+        self
+    }
+}
 
 impl SseEncode for App {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -3389,6 +3524,17 @@ impl SseEncode for crate::api::BudgetSummary {
         <i64>::sse_encode(self.monthly_balance, serializer);
         <i64>::sse_encode(self.running_balance, serializer);
         <bool>::sse_encode(self.personal, serializer);
+    }
+}
+
+impl SseEncode for crate::api::CategoryRow {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.category, serializer);
+        <bool>::sse_encode(self.income, serializer);
+        <i64>::sse_encode(self.planned, serializer);
+        <i64>::sse_encode(self.actual, serializer);
+        <i64>::sse_encode(self.forecast, serializer);
     }
 }
 
@@ -3472,6 +3618,16 @@ impl SseEncode for Vec<crate::api::BudgetSummary> {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <crate::api::BudgetSummary>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::CategoryRow> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::CategoryRow>::sse_encode(item, serializer);
         }
     }
 }
@@ -3832,6 +3988,16 @@ impl SseEncode for usize {
             .cursor
             .write_u64::<NativeEndian>(self as _)
             .unwrap();
+    }
+}
+
+impl SseEncode for crate::api::YearView {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Vec<crate::api::CategoryRow>>::sse_encode(self.categories, serializer);
+        <crate::api::Totals>::sse_encode(self.planned, serializer);
+        <crate::api::Totals>::sse_encode(self.actual, serializer);
+        <crate::api::Totals>::sse_encode(self.forecast, serializer);
     }
 }
 

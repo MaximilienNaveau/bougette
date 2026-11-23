@@ -71,6 +71,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BudgetSummary dco_decode_budget_summary(dynamic raw);
 
   @protected
+  CategoryRow dco_decode_category_row(dynamic raw);
+
+  @protected
   int dco_decode_i_16(dynamic raw);
 
   @protected
@@ -93,6 +96,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<BudgetSummary> dco_decode_list_budget_summary(dynamic raw);
+
+  @protected
+  List<CategoryRow> dco_decode_list_category_row(dynamic raw);
 
   @protected
   List<LineRow> dco_decode_list_line_row(dynamic raw);
@@ -191,6 +197,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BigInt dco_decode_usize(dynamic raw);
 
   @protected
+  YearView dco_decode_year_view(dynamic raw);
+
+  @protected
   App
   sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerApp(
     SseDeserializer deserializer,
@@ -238,6 +247,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BudgetSummary sse_decode_budget_summary(SseDeserializer deserializer);
 
   @protected
+  CategoryRow sse_decode_category_row(SseDeserializer deserializer);
+
+  @protected
   int sse_decode_i_16(SseDeserializer deserializer);
 
   @protected
@@ -264,6 +276,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<BudgetSummary> sse_decode_list_budget_summary(
     SseDeserializer deserializer,
   );
+
+  @protected
+  List<CategoryRow> sse_decode_list_category_row(SseDeserializer deserializer);
 
   @protected
   List<LineRow> sse_decode_list_line_row(SseDeserializer deserializer);
@@ -370,6 +385,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BigInt sse_decode_usize(SseDeserializer deserializer);
 
   @protected
+  YearView sse_decode_year_view(SseDeserializer deserializer);
+
+  @protected
   void
   sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerApp(
     App self,
@@ -430,6 +448,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_budget_summary(BudgetSummary self, SseSerializer serializer);
 
   @protected
+  void sse_encode_category_row(CategoryRow self, SseSerializer serializer);
+
+  @protected
   void sse_encode_i_16(int self, SseSerializer serializer);
 
   @protected
@@ -456,6 +477,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_budget_summary(
     List<BudgetSummary> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_category_row(
+    List<CategoryRow> self,
     SseSerializer serializer,
   );
 
@@ -587,6 +614,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_usize(BigInt self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_year_view(YearView self, SseSerializer serializer);
 }
 
 // Section: wire_class

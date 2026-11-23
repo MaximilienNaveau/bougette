@@ -14,6 +14,7 @@ import 'members.dart';
 import 'month.dart';
 import 'src/rust/api.dart';
 import 'trash.dart';
+import 'year.dart';
 
 class BudgetScreen extends StatefulWidget {
   const BudgetScreen({super.key, required this.app, required this.budget});
@@ -147,6 +148,20 @@ class _BudgetScreenState extends State<BudgetScreen> {
     _reload();
   }
 
+  /// The year shown, by category: planned, actual and forecast.
+  Future<void> _byCategory() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => YearScreen(
+          app: widget.app,
+          budget: _budget,
+          currency: widget.budget.currency,
+          year: _year,
+        ),
+      ),
+    );
+  }
+
   Future<void> _togglePersonal() async {
     final ok = await guard(
       context,
@@ -181,6 +196,10 @@ class _BudgetScreenState extends State<BudgetScreen> {
                   PopupMenuItem(
                     value: _rename,
                     child: Text(context.words.rename),
+                  ),
+                  PopupMenuItem(
+                    value: _byCategory,
+                    child: Text(context.words.byCategory),
                   ),
                   PopupMenuItem(
                     value: _trash,
@@ -253,7 +272,8 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
   /// The year shown, between buttons to the years before and after, each
   /// naming the year it goes to: right above the months it changes, and
-  /// apart from the screen's back arrow.
+  /// apart from the screen's back arrow. The year opens its view by
+  /// category.
   Widget _years(MonthView? view) {
     final text = Theme.of(context).textTheme;
     return Padding(
@@ -270,9 +290,14 @@ class _BudgetScreenState extends State<BudgetScreen> {
             icon: const Icon(Icons.chevron_left),
             label: Text('${_year - 1}'),
           ),
+          // The year itself opens it by category.
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text('$_year', style: text.titleLarge),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: TextButton.icon(
+              onPressed: _byCategory,
+              icon: const Icon(Icons.table_chart_outlined),
+              label: Text('$_year', style: text.titleLarge),
+            ),
           ),
           TextButton.icon(
             onPressed: () => _moveYear(1),

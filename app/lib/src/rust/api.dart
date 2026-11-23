@@ -8,8 +8,8 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `budgets_on`, `calendar_on`, `change`, `date`, `destinations`, `edit`, `export_on`, `holder_of_line`, `kind`, `line_home`, `load`, `lock`, `month_on`, `month_text`, `parse_id`, `parse_month`, `pot_move`, `repeat_of`, `schedule`, `sent`, `shown`, `source`, `status`, `stored`, `today`, `totals`, `trash_row`, `trash_since`, `with`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These functions are ignored because they are not marked as `pub`: `budgets_on`, `calendar_on`, `change`, `date`, `destinations`, `edit`, `export_on`, `holder_of_line`, `kind`, `line_home`, `load`, `lock`, `month_on`, `month_text`, `parse_id`, `parse_month`, `pot_move`, `repeat_of`, `schedule`, `sent`, `shown`, `source`, `status`, `stored`, `today`, `totals`, `trash_row`, `trash_since`, `with`, `year_on`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<App>>
 abstract class App implements RustOpaqueInterface {
@@ -266,6 +266,9 @@ abstract class App implements RustOpaqueInterface {
   /// What was deleted from `budget` in the last 30 days, the latest
   /// first (doc/scope.md: Corbeille).
   Future<List<TrashRow>> trash({required String budget});
+
+  /// The whole of `year` for budget `budget`, by category.
+  Future<YearView> year({required String budget, required int year});
 }
 
 /// Another budget, to choose where a line's money goes.
@@ -330,6 +333,50 @@ class BudgetSummary {
           monthlyBalance == other.monthlyBalance &&
           runningBalance == other.runningBalance &&
           personal == other.personal;
+}
+
+/// One category over a year, amounts counted positive (a cost unless
+/// `income`).
+class CategoryRow {
+  final String category;
+  final bool income;
+
+  /// Planned for the whole year.
+  final PlatformInt64 planned;
+
+  /// What actually happened so far.
+  final PlatformInt64 actual;
+
+  /// Expected by the end of the year: the actual of past months, the
+  /// plan of the coming ones (GLOSSARY.md: Forecast).
+  final PlatformInt64 forecast;
+
+  const CategoryRow({
+    required this.category,
+    required this.income,
+    required this.planned,
+    required this.actual,
+    required this.forecast,
+  });
+
+  @override
+  int get hashCode =>
+      category.hashCode ^
+      income.hashCode ^
+      planned.hashCode ^
+      actual.hashCode ^
+      forecast.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CategoryRow &&
+          runtimeType == other.runtimeType &&
+          category == other.category &&
+          income == other.income &&
+          planned == other.planned &&
+          actual == other.actual &&
+          forecast == other.forecast;
 }
 
 /// A line with all its amounts over time, to edit it.
@@ -866,4 +913,36 @@ class TrashRow {
           date == other.date &&
           income == other.income &&
           amount == other.amount;
+}
+
+/// A year of a budget by category, incomes first, with the totals.
+class YearView {
+  final List<CategoryRow> categories;
+  final Totals planned;
+  final Totals actual;
+  final Totals forecast;
+
+  const YearView({
+    required this.categories,
+    required this.planned,
+    required this.actual,
+    required this.forecast,
+  });
+
+  @override
+  int get hashCode =>
+      categories.hashCode ^
+      planned.hashCode ^
+      actual.hashCode ^
+      forecast.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is YearView &&
+          runtimeType == other.runtimeType &&
+          categories == other.categories &&
+          planned == other.planned &&
+          actual == other.actual &&
+          forecast == other.forecast;
 }

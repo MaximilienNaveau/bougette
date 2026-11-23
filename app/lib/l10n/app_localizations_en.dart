@@ -470,4 +470,22 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get emptyTrashQuestion =>
       'Empty the trash? What is in it can\'t be restored afterwards.';
+
+  @override
+  String get planned => 'Planned';
+
+  @override
+  String get noCategory => '(no category)';
+
+  @override
+  String yearByCategory(int year) {
+    return '$year by category';
+  }
+
+  @override
+  String get yearForecastHint =>
+      'Planned: the whole year\'s plan. Actual: what happened so far. Forecast: the actual of the past months and the plan of the coming ones, the expected total at the end of the year. Costs are negative; money paid from a pot isn\'t counted, its allocations are.';
+
+  @override
+  String get byCategory => 'Year by category';
 }

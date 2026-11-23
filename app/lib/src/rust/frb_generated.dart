@@ -68,7 +68,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 1813226342;
+  int get rustContentHash => 298319008;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -318,6 +318,12 @@ abstract class RustLibApi extends BaseApi {
   Future<List<TrashRow>> crateApiAppTrash({
     required App that,
     required String budget,
+  });
+
+  Future<YearView> crateApiAppYear({
+    required App that,
+    required String budget,
+    required int year,
   });
 
   RustArcIncrementStrongCountFnType get rust_arc_increment_strong_count_App;
@@ -2012,6 +2018,45 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiAppTrashConstMeta =>
       const TaskConstMeta(debugName: "App_trash", argNames: ["that", "budget"]);
 
+  @override
+  Future<YearView> crateApiAppYear({
+    required App that,
+    required String budget,
+    required int year,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerApp(
+            that,
+            serializer,
+          );
+          sse_encode_String(budget, serializer);
+          sse_encode_i_16(year, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 42,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_year_view,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiAppYearConstMeta,
+        argValues: [that, budget, year],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiAppYearConstMeta => const TaskConstMeta(
+    debugName: "App_year",
+    argNames: ["that", "budget", "year"],
+  );
+
   RustArcIncrementStrongCountFnType
   get rust_arc_increment_strong_count_App => wire
       .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerApp;
@@ -2118,6 +2163,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  CategoryRow dco_decode_category_row(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return CategoryRow(
+      category: dco_decode_String(arr[0]),
+      income: dco_decode_bool(arr[1]),
+      planned: dco_decode_i_64(arr[2]),
+      actual: dco_decode_i_64(arr[3]),
+      forecast: dco_decode_i_64(arr[4]),
+    );
+  }
+
+  @protected
   int dco_decode_i_16(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
@@ -2192,6 +2252,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   List<BudgetSummary> dco_decode_list_budget_summary(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_budget_summary).toList();
+  }
+
+  @protected
+  List<CategoryRow> dco_decode_list_category_row(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_category_row).toList();
   }
 
   @protected
@@ -2486,6 +2552,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  YearView dco_decode_year_view(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return YearView(
+      categories: dco_decode_list_category_row(arr[0]),
+      planned: dco_decode_totals(arr[1]),
+      actual: dco_decode_totals(arr[2]),
+      forecast: dco_decode_totals(arr[3]),
+    );
+  }
+
+  @protected
   App
   sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerApp(
     SseDeserializer deserializer,
@@ -2590,6 +2670,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       monthlyBalance: var_monthlyBalance,
       runningBalance: var_runningBalance,
       personal: var_personal,
+    );
+  }
+
+  @protected
+  CategoryRow sse_decode_category_row(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_category = sse_decode_String(deserializer);
+    var var_income = sse_decode_bool(deserializer);
+    var var_planned = sse_decode_i_64(deserializer);
+    var var_actual = sse_decode_i_64(deserializer);
+    var var_forecast = sse_decode_i_64(deserializer);
+    return CategoryRow(
+      category: var_category,
+      income: var_income,
+      planned: var_planned,
+      actual: var_actual,
+      forecast: var_forecast,
     );
   }
 
@@ -2703,6 +2800,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <BudgetSummary>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_budget_summary(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<CategoryRow> sse_decode_list_category_row(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <CategoryRow>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_category_row(deserializer));
     }
     return ans_;
   }
@@ -3093,6 +3202,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  YearView sse_decode_year_view(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_categories = sse_decode_list_category_row(deserializer);
+    var var_planned = sse_decode_totals(deserializer);
+    var var_actual = sse_decode_totals(deserializer);
+    var var_forecast = sse_decode_totals(deserializer);
+    return YearView(
+      categories: var_categories,
+      planned: var_planned,
+      actual: var_actual,
+      forecast: var_forecast,
+    );
+  }
+
+  @protected
   void
   sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerApp(
     App self,
@@ -3204,6 +3328,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_category_row(CategoryRow self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.category, serializer);
+    sse_encode_bool(self.income, serializer);
+    sse_encode_i_64(self.planned, serializer);
+    sse_encode_i_64(self.actual, serializer);
+    sse_encode_i_64(self.forecast, serializer);
+  }
+
+  @protected
   void sse_encode_i_16(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putInt16(self);
@@ -3282,6 +3416,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_budget_summary(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_category_row(
+    List<CategoryRow> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_category_row(item, serializer);
     }
   }
 
@@ -3605,6 +3751,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_usize(BigInt self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putBigUint64(self);
+  }
+
+  @protected
+  void sse_encode_year_view(YearView self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_list_category_row(self.categories, serializer);
+    sse_encode_totals(self.planned, serializer);
+    sse_encode_totals(self.actual, serializer);
+    sse_encode_totals(self.forecast, serializer);
   }
 }
 
@@ -4049,4 +4204,10 @@ class AppImpl extends RustOpaque implements App {
   /// first (doc/scope.md: Corbeille).
   Future<List<TrashRow>> trash({required String budget}) =>
       RustLib.instance.api.crateApiAppTrash(that: this, budget: budget);
+
+  /// The whole of `year` for budget `budget`, by category.
+  Future<YearView> year({required String budget, required int year}) => RustLib
+      .instance
+      .api
+      .crateApiAppYear(that: this, budget: budget, year: year);
 }

@@ -196,6 +196,39 @@ void main() {
     );
   });
 
+  testWidgets('the year by category', (tester) async {
+    tester.view.physicalSize = const Size(1600, 1200);
+    tester.view.devicePixelRatio = 1;
+    final year = DateTime.now().year;
+    final app = (await tester.runAsync(() async {
+      final folder = Directory.systemTemp.createTempSync('bougette-test');
+      final app = await App.open(path: '${folder.path}/test.sqlite');
+      final id = await app.createBudget(name: 'Maison', currency: 'EUR');
+      await app.addLine(
+        budget: id,
+        name: 'Loyer',
+        category: 'Logement',
+        income: false,
+        amount: 110000,
+        repeat: Repeat.monthly,
+        first: '$year-01-05',
+      );
+      return app;
+    }))!;
+    await tester.pumpWidget(BougetteApp(app: app));
+    await settle(tester);
+    await tapSoon(tester, find.text('Maison'));
+    await settle(tester);
+
+    // The year above the months opens it by category.
+    await tapSoon(tester, find.text('$year'));
+    await settle(tester);
+    await expectSoon(tester, find.text('$year by category'), findsOneWidget);
+    await expectSoon(tester, find.text('Logement'), findsOneWidget);
+    // Twelve rents planned: the category's row and the balance's.
+    await expectSoon(tester, find.text('-€13,200.00'), findsNWidgets(2));
+  });
+
   testWidgets('a narrow window shows the whole year', (tester) async {
     final app = (await tester.runAsync(() async {
       final folder = Directory.systemTemp.createTempSync('bougette-test');

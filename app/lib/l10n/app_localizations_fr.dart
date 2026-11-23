@@ -471,4 +471,22 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get emptyTrashQuestion =>
       'Vider la corbeille ? Ce qu\'elle contient ne pourra plus être restauré.';
+
+  @override
+  String get planned => 'Prévu';
+
+  @override
+  String get noCategory => '(sans catégorie)';
+
+  @override
+  String yearByCategory(int year) {
+    return '$year par catégorie';
+  }
+
+  @override
+  String get yearForecastHint =>
+      'Prévu : le prévu de toute l\'année. Réel : ce qui s\'est passé jusqu\'ici. Projection : le réel des mois passés et le prévu des mois à venir, le total attendu à la fin de l\'année. Les dépenses sont négatives ; ce qui est payé depuis une cagnotte n\'est pas compté, ce qu\'on y met l\'est.';
+
+  @override
+  String get byCategory => 'L\'année par catégorie';
 }

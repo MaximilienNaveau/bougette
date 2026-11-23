@@ -137,5 +137,10 @@
   "restored": "Restauré",
   "deletedOn": "Supprimé le {date}",
   "emptyTrash": "Vider la corbeille",
-  "emptyTrashQuestion": "Vider la corbeille ? Ce qu'elle contient ne pourra plus être restauré."
+  "emptyTrashQuestion": "Vider la corbeille ? Ce qu'elle contient ne pourra plus être restauré.",
+  "planned": "Prévu",
+  "noCategory": "(sans catégorie)",
+  "yearByCategory": "{year} par catégorie",
+  "yearForecastHint": "Prévu : le prévu de toute l'année. Réel : ce qui s'est passé jusqu'ici. Projection : le réel des mois passés et le prévu des mois à venir, le total attendu à la fin de l'année. Les dépenses sont négatives ; ce qui est payé depuis une cagnotte n'est pas compté, ce qu'on y met l'est.",
+  "byCategory": "L'année par catégorie"
 }

@@ -236,6 +236,30 @@ pub struct MonthView {
     pub first_year: i16,
 }
 
+/// One category over a year, amounts counted positive (a cost unless
+/// `income`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CategoryRow {
+    pub category: String,
+    pub income: bool,
+    /// Planned for the whole year.
+    pub planned: i64,
+    /// What actually happened so far.
+    pub actual: i64,
+    /// Expected by the end of the year: the actual of past months, the
+    /// plan of the coming ones (GLOSSARY.md: Forecast).
+    pub forecast: i64,
+}
+
+/// A year of a budget by category, incomes first, with the totals.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct YearView {
+    pub categories: Vec<CategoryRow>,
+    pub planned: Totals,
+    pub actual: Totals,
+    pub forecast: Totals,
+}
+
 /// When a new line is due, from its first due date on. A plain enum (no
 /// data in its variants) becomes a plain Dart enum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -293,6 +317,11 @@ impl App {
     /// Month `month` (`2026-11`) of budget `budget`.
     pub fn month(&self, budget: String, month: String) -> Result<MonthView, String> {
         self.month_on(&budget, &month, today())
+    }
+
+    /// The whole of `year` for budget `budget`, by category.
+    pub fn year(&self, budget: String, year: i16) -> Result<YearView, String> {
+        self.year_on(&budget, year, today())
     }
 
     /// Adds a planned line: `amount` cents, due as `repeat` says from
@@ -994,6 +1023,45 @@ impl App {
         })
     }
 
+    fn year_on(&self, budget: &str, year: i16, today: Date) -> Result<YearView, String> {
+        let budget = self.shown(budget)?;
+        let zero = Money::zero(budget.currency());
+        let empty = MonthTotals {
+            incomes: zero,
+            costs: zero,
+        };
+        let (mut planned, mut actual, mut forecast) = (empty, empty, empty);
+        let mut categories = Vec::new();
+        for row in budget.year_by_category(year, today) {
+            let income = row.kind == Kind::Income;
+            // Each total, on the side of the row's kind.
+            for (totals, amount) in [
+                (&mut planned, row.planned),
+                (&mut actual, row.actual),
+                (&mut forecast, row.forecast),
+            ] {
+                if income {
+                    totals.incomes += amount;
+                } else {
+                    totals.costs += amount;
+                }
+            }
+            categories.push(CategoryRow {
+                category: row.category,
+                income,
+                planned: row.planned.minor_units(),
+                actual: row.actual.minor_units(),
+                forecast: row.forecast.minor_units(),
+            });
+        }
+        Ok(YearView {
+            categories,
+            planned: totals(planned),
+            actual: totals(actual),
+            forecast: totals(forecast),
+        })
+    }
+
     /// The budgets a new cost line of `budget` can send its money to (see
     /// `MonthView::destinations`).
     fn destinations(&self, budget: &Budget) -> Result<Vec<BudgetChoice>, String> {
@@ -1366,6 +1434,38 @@ mod tests {
         assert_eq!(view.transactions[0].line.as_deref(), Some("Rent"));
         assert_eq!(view.status, Status::Over);
         assert!(app.month_on(&id, "November", day(2026, 11, 16)).is_err());
+    }
+
+    #[test]
+    fn a_year_shows_each_category_and_the_totals() {
+        let app = app();
+        let id = household(&app);
+        let year = app.year_on(&id, 2026, day(2026, 11, 16)).unwrap();
+        let rows: Vec<_> = year
+            .categories
+            .iter()
+            .map(|row| {
+                (
+                    row.category.as_str(),
+                    row.income,
+                    row.planned,
+                    row.actual,
+                    row.forecast,
+                )
+            })
+            .collect();
+        assert_eq!(
+            rows,
+            [
+                // November's pay as planned, then December's.
+                ("Income", true, 12 * 250000, 0, 2 * 250000),
+                // The €950 rent of November, then December's €900.
+                ("Housing", false, 12 * 90000 + 48000, 95000, 95000 + 90000),
+            ]
+        );
+        assert_eq!(year.planned.balance, 12 * 250000 - (12 * 90000 + 48000));
+        assert_eq!(year.actual.balance, -95000);
+        assert_eq!(year.forecast.balance, 2 * 250000 - 185000);
     }
 
     #[test]

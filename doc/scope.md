@@ -42,6 +42,7 @@ Décisions de périmètre prises pendant la séance de cadrage des 14 et 15 nove
   - jaune ou orange : proche du prévu (au moins 90 %, seuil fixe en v1) ;
   - rouge : dépassement, avec le montant réel affiché.
 - **Projection du mois en cours** : pour chaque poste, max(réel à date, prévu), plus les dépenses imprévues.
+- **Bilan de l'année par catégorie** : pour chaque catégorie, le prévu de toute l'année, le réel jusqu'ici et la projection de fin d'année (le réel des mois passés, la projection du mois en cours, le prévu des mois à venir) ; elle se corrige à mesure que les opérations arrivent.
 - **Calendrier** : par défaut l'année civile en cours, de janvier à décembre ; on peut faire défiler vers le passé jusqu'à l'année de la première entrée du budget (poste ou opération), et sans limite vers l'avenir.
 - **Écran d'accueil** : la liste de mes budgets, chacun avec son solde mensuel et son solde cumulé, sans total agrégé.
 - **Serveurs** :

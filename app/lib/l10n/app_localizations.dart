@@ -925,6 +925,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Empty the trash? What is in it can\'t be restored afterwards.'**
   String get emptyTrashQuestion;
+
+  /// No description provided for @planned.
+  ///
+  /// In en, this message translates to:
+  /// **'Planned'**
+  String get planned;
+
+  /// No description provided for @noCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'(no category)'**
+  String get noCategory;
+
+  /// No description provided for @yearByCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'{year} by category'**
+  String yearByCategory(int year);
+
+  /// No description provided for @yearForecastHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Planned: the whole year\'s plan. Actual: what happened so far. Forecast: the actual of the past months and the plan of the coming ones, the expected total at the end of the year. Costs are negative; money paid from a pot isn\'t counted, its allocations are.'**
+  String get yearForecastHint;
+
+  /// No description provided for @byCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Year by category'**
+  String get byCategory;
 }
 
 class _AppLocalizationsDelegate
