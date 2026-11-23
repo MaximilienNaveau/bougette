@@ -12,7 +12,7 @@ repository.workspace = true
 # Licence: Unlicense OR MIT.
 # No default features: they bring time zones and their database, which
 # calendar dates don't need.
-jiff = { version = "0.2", default-features = false, features = ["std"] }
+jiff = { version = "1.0", default-features = false, features = ["std"] }
 # Identifiers for lines and transactions that stay unique across devices,
 # so changes made offline on two devices never collide (M1 sync). Version
 # 7 UUIDs start with a timestamp, so they sort by creation time.

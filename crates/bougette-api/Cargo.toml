@@ -24,7 +24,7 @@ tokio = { version = "1.54", features = ["rt-multi-thread", "net", "time"] }
 # To read the identifiers the app sends back.
 uuid = "1.29"
 # Dates, and today's date in the system's time zone (as in the CLI).
-jiff = { version = "0.2", default-features = false, features = [
+jiff = { version = "1.0", default-features = false, features = [
     "std",
     "tz-system",
     "tzdb-zoneinfo",
