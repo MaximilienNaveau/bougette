@@ -139,6 +139,12 @@ void main() {
       find.text('Change the transaction'),
       findsOneWidget,
     );
+    // Who added it and when: this member, just now.
+    await expectSoon(
+      tester,
+      find.textContaining('Added: you, '),
+      findsOneWidget,
+    );
     await tester.enterText(find.widgetWithText(TextField, '42.00'), '45');
     await tapSoon(tester, find.text('OK'));
     await settle(tester);

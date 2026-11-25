@@ -82,6 +82,25 @@ impl From<Corrupt> for StoreError {
 /// latest message held here.
 pub type Versions = BTreeMap<(String, String), String>;
 
+/// Who created a line or a transaction, and who changed it last (see
+/// `Store::trace`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Trace {
+    pub created: Stamp,
+    pub changed: Stamp,
+}
+
+/// When, and by which member, something was written.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Stamp {
+    /// Milliseconds since 1970.
+    pub millis: u64,
+    /// The member's identifier.
+    pub member: String,
+    /// The name they gave themselves in the budget, if any.
+    pub name: Option<String>,
+}
+
 /// The storage of one device, or of a server.
 pub struct Store {
     connection: Connection,
@@ -423,6 +442,55 @@ impl Store {
                 (millis >= since).then_some((millis, item))
             })
             .collect())
+    }
+
+    /// Who created `entity` `id` of budget `budget` and when, and who
+    /// changed it last and when (doc/scope.md: Traçabilité); `None` if it
+    /// has no field. A line's changes include those of its revisions.
+    pub fn trace(
+        &self,
+        budget: BudgetId,
+        entity: &str,
+        id: &str,
+    ) -> Result<Option<Trace>, StoreError> {
+        let budget = budget.to_string();
+        // The oldest field was written when the entity was created: only
+        // the fields that change are written again (see `save`).
+        let mut statement = self.connection.prepare(
+            "SELECT timestamp, author FROM fields
+             WHERE budget = ?1 AND ((entity = ?2 AND id = ?3)
+                OR (?2 = 'line' AND entity = 'revision' AND id LIKE ?3 || '/%'))
+             ORDER BY timestamp",
+        )?;
+        let rows = statement.query_map(params![budget, entity, id], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?;
+        let stamps: Vec<(String, String)> = rows.collect::<Result<_, _>>()?;
+        // `first` and `last` are Options: `let ... else` leaves on `None`.
+        let (Some(first), Some(last)) = (stamps.first(), stamps.last()) else {
+            return Ok(None);
+        };
+        Ok(Some(Trace {
+            created: self.stamp(&budget, first)?,
+            changed: self.stamp(&budget, last)?,
+        }))
+    }
+
+    /// A field's (timestamp, author) as a Stamp, with the author's name.
+    fn stamp(
+        &self,
+        budget: &str,
+        (timestamp, author): &(String, String),
+    ) -> Result<Stamp, StoreError> {
+        Ok(Stamp {
+            // A timestamp starts with its milliseconds (clock.rs).
+            millis: timestamp
+                .get(..16)
+                .and_then(|m| m.parse().ok())
+                .unwrap_or(0),
+            member: author.clone(),
+            name: self.member_name(budget, author)?,
+        })
     }
 
     /// `budget` as this member sees it: a personal budget also shows what
@@ -924,6 +992,34 @@ mod tests {
         store.save(&budget).unwrap();
         assert_eq!(message_count(&store), before + 1);
         assert_eq!(store.load(budget.id).unwrap(), Some(budget));
+    }
+
+    #[test]
+    fn a_line_knows_who_created_and_last_changed_it() {
+        let mut store = Store::open_in_memory().unwrap();
+        store.set_name("Alice").unwrap();
+        let mut budget = store.create(sample()).unwrap();
+        let line = budget.lines()[0].id.to_string();
+        let created = store.trace(budget.id, "line", &line).unwrap().unwrap();
+        // Its fields are written one by one, milliseconds apart.
+        assert!(created.created.millis <= created.changed.millis);
+        assert_eq!(created.created.name.as_deref(), Some("Alice"));
+        assert_eq!(created.created.member, store.member().unwrap());
+
+        // A new amount from March: a revision, which counts as a change
+        // of the line.
+        let id = budget.lines()[0].id;
+        let schedule = budget.lines()[0].revisions()[0].schedule;
+        budget
+            .change_line(id, date(2026, 3, 1), eur(95000), schedule)
+            .unwrap();
+        store.save(&budget).unwrap();
+        let changed = store.trace(budget.id, "line", &line).unwrap().unwrap();
+        assert_eq!(changed.created, created.created);
+        assert!(changed.changed.millis >= created.created.millis);
+        assert!(changed.changed.millis >= created.changed.millis);
+
+        assert_eq!(store.trace(budget.id, "line", "none").unwrap(), None);
     }
 
     #[test]

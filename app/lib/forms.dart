@@ -97,6 +97,55 @@ String centsText(int cents) =>
 String day(DateTime date) =>
     '${date.year}-${'${date.month}'.padLeft(2, '0')}-${'${date.day}'.padLeft(2, '0')}';
 
+/// Who added `item` (a line or a transaction shown in `budget`) and who
+/// changed it last, in small print (doc/scope.md: Traçabilité). Nothing
+/// while it loads, or if it can't be found.
+class TraceText extends StatefulWidget {
+  const TraceText({
+    super.key,
+    required this.app,
+    required this.budget,
+    required this.item,
+  });
+
+  final App app;
+  final String budget;
+  final String item;
+
+  @override
+  State<TraceText> createState() => _TraceTextState();
+}
+
+class _TraceTextState extends State<TraceText> {
+  late final Future<Trace> _trace = widget.app.trace(
+    budget: widget.budget,
+    item: widget.item,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final words = context.words;
+    // "you", or the member's name.
+    String who(Stamp stamp) => stamp.me ? words.you : stamp.by;
+    return FutureBuilder(
+      future: _trace,
+      builder: (context, snapshot) {
+        final trace = snapshot.data;
+        if (trace == null) return const SizedBox.shrink();
+        final changed = trace.changed;
+        return Text(
+          [
+            words.addedBy(who(trace.added), timeText(trace.added.time)),
+            if (changed != null)
+              words.changedBy(who(changed), timeText(changed.time)),
+          ].join('\n'),
+          style: Theme.of(context).textTheme.bodySmall,
+        );
+      },
+    );
+  }
+}
+
 /// A button showing a date, which opens a calendar to change it.
 Widget dateButton(
   BuildContext context,
@@ -398,7 +447,11 @@ Future<bool> addTransaction(
         date,
         (picked) => setState(() => date = picked),
       ),
-      if (existing != null)
+      if (existing != null) ...[
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TraceText(app: app, budget: budget, item: existing.id),
+        ),
         Align(
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
@@ -411,6 +464,7 @@ Future<bool> addTransaction(
             },
           ),
         ),
+      ],
     ],
     (context) async {
       final value = cents(amount.text);

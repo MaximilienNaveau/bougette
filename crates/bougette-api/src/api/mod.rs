@@ -165,6 +165,26 @@ pub struct TrashRow {
     pub amount: i64,
 }
 
+/// Who added a line or a transaction, and who changed it last (doc/scope.md:
+/// Traçabilité).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Trace {
+    pub added: Stamp,
+    /// `None` if not changed since: same member, within the same minute.
+    pub changed: Option<Stamp>,
+}
+
+/// When, and by whom, something was written.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Stamp {
+    /// `2026-11-24T14:05`, where the user is.
+    pub time: String,
+    /// The member's name, or the start of their identifier if unnamed.
+    pub by: String,
+    /// Written by this member.
+    pub me: bool,
+}
+
 /// A transaction in a month.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransactionRow {
@@ -758,6 +778,56 @@ impl App {
 
     /// Since when deletions from `budget` can be restored (milliseconds):
     /// the last 30 days, or since its trash was emptied.
+    /// Who added `item` (a line or a transaction shown in `budget`) and
+    /// who changed it last; it may be held by another budget (a
+    /// reflection).
+    pub fn trace(&self, budget: String, item: String) -> Result<Trace, String> {
+        let id = parse_id(&item)?;
+        let own = self.load(&budget)?;
+        // Where it is held, and as what.
+        let (holder, entity) = if own.line(LineId(id)).is_some() {
+            (own.id, "line")
+        } else if own.transactions().iter().any(|t| t.id == TransactionId(id)) {
+            (own.id, "transaction")
+        } else {
+            // Each lookup in its own statement: the lock is released at
+            // its `;` (see `export_on`).
+            let line_holder = self.lock().budget_of_line(LineId(id)).map_err(stored)?;
+            match line_holder {
+                Some(other) => (other.id, "line"),
+                None => {
+                    let other = self
+                        .lock()
+                        .budget_of_transaction(TransactionId(id))
+                        .map_err(stored)?
+                        .ok_or("no such line or transaction")?;
+                    (other.id, "transaction")
+                }
+            }
+        };
+        let mut store = self.lock();
+        let me = store.member().map_err(stored)?;
+        let trace = store
+            .trace(holder, entity, &item)
+            .map_err(stored)?
+            .ok_or("no such line or transaction")?;
+        // The same member within the same minute: still the adding.
+        let changed = trace.changed.member != trace.created.member
+            || trace.changed.millis >= trace.created.millis + 60_000;
+        let stamp = |stamp: bougette_store::Stamp| Stamp {
+            time: local_time(stamp.millis),
+            me: stamp.member == me,
+            // `chars().take(8)`: the first 8 characters, never cutting one.
+            by: stamp
+                .name
+                .unwrap_or_else(|| stamp.member.chars().take(8).collect()),
+        };
+        Ok(Trace {
+            added: stamp(trace.created),
+            changed: changed.then(|| stamp(trace.changed)),
+        })
+    }
+
     fn trash_since(&self, budget: &str) -> Result<u64, String> {
         let days = jiff::Timestamp::now().as_millisecond() - TRASH_DAYS * 86_400_000;
         // In its own statement, as above: `self.lock()` lives until `;`.
@@ -1261,18 +1331,24 @@ fn kind(income: bool) -> Kind {
 /// How long deleted lines and transactions can be restored.
 const TRASH_DAYS: i64 = 30;
 
-/// A trash entry as the app shows it, deleted at `when` (milliseconds).
-fn trash_row(when: u64, item: Trashed) -> TrashRow {
-    // The day of deletion where the user is.
-    let deleted_on = i64::try_from(when)
+/// A time (milliseconds since 1970) where the user is, to the minute:
+/// `2026-11-24T14:05`. Empty if out of range.
+fn local_time(millis: u64) -> String {
+    i64::try_from(millis)
         .ok()
         .and_then(|millis| jiff::Timestamp::from_millisecond(millis).ok())
         .map(|time| {
             time.to_zoned(jiff::tz::TimeZone::system())
-                .date()
+                .strftime("%Y-%m-%dT%H:%M")
                 .to_string()
         })
-        .unwrap_or_default();
+        .unwrap_or_default()
+}
+
+/// A trash entry as the app shows it, deleted at `when` (milliseconds).
+fn trash_row(when: u64, item: Trashed) -> TrashRow {
+    // The day of deletion where the user is: the date part of the time.
+    let deleted_on = local_time(when).chars().take(10).collect();
     match item {
         Trashed::Line(line) => TrashRow {
             id: line.id.to_string(),
@@ -1434,6 +1510,21 @@ mod tests {
         assert_eq!(view.transactions[0].line.as_deref(), Some("Rent"));
         assert_eq!(view.status, Status::Over);
         assert!(app.month_on(&id, "November", day(2026, 11, 16)).is_err());
+    }
+
+    #[test]
+    fn lines_and_transactions_say_who_added_them() {
+        let app = app();
+        let id = household(&app);
+        let view = app.month_on(&id, "2026-11", day(2026, 11, 16)).unwrap();
+        for item in [&view.lines[1].id, &view.transactions[0].id] {
+            let trace = app.trace(id.clone(), item.clone()).unwrap();
+            assert!(trace.added.me);
+            // `2026-11-24T14:05`: a date, a `T` and the time.
+            assert_eq!(trace.added.time.len(), 16);
+            assert_eq!(trace.changed, None);
+        }
+        assert!(app.trace(id, LineId::new().to_string()).is_err());
     }
 
     #[test]

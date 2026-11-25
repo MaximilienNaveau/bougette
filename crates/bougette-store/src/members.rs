@@ -351,7 +351,11 @@ impl Store {
         Ok(latest.into_values().collect())
     }
 
-    fn member_name(&self, budget: &str, member: &str) -> Result<Option<String>, StoreError> {
+    pub(crate) fn member_name(
+        &self,
+        budget: &str,
+        member: &str,
+    ) -> Result<Option<String>, StoreError> {
         Ok(self
             .connection
             .query_row(

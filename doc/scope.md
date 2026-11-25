@@ -81,7 +81,7 @@ Chaque jalon est utilisable et testé seul.
    - budget partagé avec versements et avances reflétés dans le budget personnel du membre (payeur ou bénéficiaire d'une opération) ;
    - phrase de récupération ;
    - outils en ligne de commande du serveur ;
-   - restent pour la v1 : les notifications internes, la corbeille, l'archivage et la suppression d'un budget, l'affichage de l'auteur et de la dernière modification, les équilibrages directs entre membres, la découverte en réseau local et le QR code.
+   - restent pour la v1 : les notifications internes, l'archivage et la suppression d'un budget, les équilibrages directs entre membres, la découverte en réseau local et le QR code.
 4. **M3 : interface Linux** : Flutter sur le même cœur, vue calendrier et couleurs.
    - l'app n'appelle que `bougette-api`, qui lui donne des vues prêtes à afficher (budgets et soldes, calendrier de l'année, détail d'un mois) ; elle ne calcule rien ;
    - Nix construit la bibliothèque Rust à part et la place à côté de l'app : pas de compilation Rust dans la compilation Flutter ;

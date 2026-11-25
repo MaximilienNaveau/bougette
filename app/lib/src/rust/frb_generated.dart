@@ -68,7 +68,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 298319008;
+  int get rustContentHash => 1014714540;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -314,6 +314,12 @@ abstract class RustLibApi extends BaseApi {
   Future<String?> crateApiAppSetUpRecovery({required App that, String? phrase});
 
   Future<SyncSummary> crateApiAppSyncNow({required App that});
+
+  Future<Trace> crateApiAppTrace({
+    required App that,
+    required String budget,
+    required String item,
+  });
 
   Future<List<TrashRow>> crateApiAppTrash({
     required App that,
@@ -1984,6 +1990,45 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "App_sync_now", argNames: ["that"]);
 
   @override
+  Future<Trace> crateApiAppTrace({
+    required App that,
+    required String budget,
+    required String item,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerApp(
+            that,
+            serializer,
+          );
+          sse_encode_String(budget, serializer);
+          sse_encode_String(item, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 41,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_trace,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiAppTraceConstMeta,
+        argValues: [that, budget, item],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiAppTraceConstMeta => const TaskConstMeta(
+    debugName: "App_trace",
+    argNames: ["that", "budget", "item"],
+  );
+
+  @override
   Future<List<TrashRow>> crateApiAppTrash({
     required App that,
     required String budget,
@@ -2000,7 +2045,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 41,
+            funcId: 42,
             port: port_,
           );
         },
@@ -2037,7 +2082,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 42,
+            funcId: 43,
             port: port_,
           );
         },
@@ -2132,6 +2177,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ServerInfo dco_decode_box_autoadd_server_info(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_server_info(raw);
+  }
+
+  @protected
+  Stamp dco_decode_box_autoadd_stamp(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_stamp(raw);
   }
 
   @protected
@@ -2406,6 +2457,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  Stamp? dco_decode_opt_box_autoadd_stamp(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_stamp(raw);
+  }
+
+  @protected
   PotRow dco_decode_pot_row(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -2458,6 +2515,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  Stamp dco_decode_stamp(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return Stamp(
+      time: dco_decode_String(arr[0]),
+      by: dco_decode_String(arr[1]),
+      me: dco_decode_bool(arr[2]),
+    );
+  }
+
+  @protected
   Status dco_decode_status(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return Status.values[raw as int];
@@ -2485,6 +2555,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       incomes: dco_decode_i_64(arr[0]),
       costs: dco_decode_i_64(arr[1]),
       balance: dco_decode_i_64(arr[2]),
+    );
+  }
+
+  @protected
+  Trace dco_decode_trace(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return Trace(
+      added: dco_decode_stamp(arr[0]),
+      changed: dco_decode_opt_box_autoadd_stamp(arr[1]),
     );
   }
 
@@ -2644,6 +2726,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ServerInfo sse_decode_box_autoadd_server_info(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_server_info(deserializer));
+  }
+
+  @protected
+  Stamp sse_decode_box_autoadd_stamp(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_stamp(deserializer));
   }
 
   @protected
@@ -3055,6 +3143,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  Stamp? sse_decode_opt_box_autoadd_stamp(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_stamp(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   PotRow sse_decode_pot_row(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_id = sse_decode_String(deserializer);
@@ -3103,6 +3202,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  Stamp sse_decode_stamp(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_time = sse_decode_String(deserializer);
+    var var_by = sse_decode_String(deserializer);
+    var var_me = sse_decode_bool(deserializer);
+    return Stamp(time: var_time, by: var_by, me: var_me);
+  }
+
+  @protected
   Status sse_decode_status(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
@@ -3124,6 +3232,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_costs = sse_decode_i_64(deserializer);
     var var_balance = sse_decode_i_64(deserializer);
     return Totals(incomes: var_incomes, costs: var_costs, balance: var_balance);
+  }
+
+  @protected
+  Trace sse_decode_trace(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_added = sse_decode_stamp(deserializer);
+    var var_changed = sse_decode_opt_box_autoadd_stamp(deserializer);
+    return Trace(added: var_added, changed: var_changed);
   }
 
   @protected
@@ -3307,6 +3423,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_server_info(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_stamp(Stamp self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_stamp(self, serializer);
   }
 
   @protected
@@ -3641,6 +3763,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_stamp(Stamp? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_stamp(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_pot_row(PotRow self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.id, serializer);
@@ -3678,6 +3810,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_stamp(Stamp self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.time, serializer);
+    sse_encode_String(self.by, serializer);
+    sse_encode_bool(self.me, serializer);
+  }
+
+  @protected
   void sse_encode_status(Status self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
@@ -3696,6 +3836,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_64(self.incomes, serializer);
     sse_encode_i_64(self.costs, serializer);
     sse_encode_i_64(self.balance, serializer);
+  }
+
+  @protected
+  void sse_encode_trace(Trace self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_stamp(self.added, serializer);
+    sse_encode_opt_box_autoadd_stamp(self.changed, serializer);
   }
 
   @protected
@@ -4197,6 +4344,16 @@ class AppImpl extends RustOpaque implements App {
   /// Syncs with the server. (Not `sync`: a keyword in Dart.)
   Future<SyncSummary> syncNow() =>
       RustLib.instance.api.crateApiAppSyncNow(that: this);
+
+  /// Since when deletions from `budget` can be restored (milliseconds):
+  /// the last 30 days, or since its trash was emptied.
+  /// Who added `item` (a line or a transaction shown in `budget`) and
+  /// who changed it last; it may be held by another budget (a
+  /// reflection).
+  Future<Trace> trace({required String budget, required String item}) => RustLib
+      .instance
+      .api
+      .crateApiAppTrace(that: this, budget: budget, item: item);
 
   /// Removes transaction `transaction`: from the budget that holds it,
   /// if it's seen here as a reflection.

@@ -8,8 +8,8 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `budgets_on`, `calendar_on`, `change`, `date`, `destinations`, `edit`, `export_on`, `holder_of_line`, `kind`, `line_home`, `load`, `lock`, `month_on`, `month_text`, `parse_id`, `parse_month`, `pot_move`, `repeat_of`, `schedule`, `sent`, `shown`, `source`, `status`, `stored`, `today`, `totals`, `trash_row`, `trash_since`, `with`, `year_on`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These functions are ignored because they are not marked as `pub`: `budgets_on`, `calendar_on`, `change`, `date`, `destinations`, `edit`, `export_on`, `holder_of_line`, `kind`, `line_home`, `load`, `local_time`, `lock`, `month_on`, `month_text`, `parse_id`, `parse_month`, `pot_move`, `repeat_of`, `schedule`, `sent`, `shown`, `source`, `status`, `stored`, `today`, `totals`, `trash_row`, `trash_since`, `with`, `year_on`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<App>>
 abstract class App implements RustOpaqueInterface {
@@ -260,6 +260,13 @@ abstract class App implements RustOpaqueInterface {
 
   /// Syncs with the server. (Not `sync`: a keyword in Dart.)
   Future<SyncSummary> syncNow();
+
+  /// Since when deletions from `budget` can be restored (milliseconds):
+  /// the last 30 days, or since its trash was emptied.
+  /// Who added `item` (a line or a transaction shown in `budget`) and
+  /// who changed it last; it may be held by another budget (a
+  /// reflection).
+  Future<Trace> trace({required String budget, required String item});
 
   /// Removes transaction `transaction`: from the budget that holds it,
   /// if it's seen here as a reflection.
@@ -744,6 +751,32 @@ enum Source {
   plan,
 }
 
+/// When, and by whom, something was written.
+class Stamp {
+  /// `2026-11-24T14:05`, where the user is.
+  final String time;
+
+  /// The member's name, or the start of their identifier if unnamed.
+  final String by;
+
+  /// Written by this member.
+  final bool me;
+
+  const Stamp({required this.time, required this.by, required this.me});
+
+  @override
+  int get hashCode => time.hashCode ^ by.hashCode ^ me.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Stamp &&
+          runtimeType == other.runtimeType &&
+          time == other.time &&
+          by == other.by &&
+          me == other.me;
+}
+
 /// How a cost compares with its plan: the colour shown (doc/scope.md).
 enum Status {
   /// No colour: an income, or a month to come.
@@ -782,6 +815,28 @@ class Totals {
           incomes == other.incomes &&
           costs == other.costs &&
           balance == other.balance;
+}
+
+/// Who added a line or a transaction, and who changed it last (doc/scope.md:
+/// Traçabilité).
+class Trace {
+  final Stamp added;
+
+  /// `None` if not changed since: same member, within the same minute.
+  final Stamp? changed;
+
+  const Trace({required this.added, this.changed});
+
+  @override
+  int get hashCode => added.hashCode ^ changed.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Trace &&
+          runtimeType == other.runtimeType &&
+          added == other.added &&
+          changed == other.changed;
 }
 
 /// A transaction in a month.

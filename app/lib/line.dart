@@ -367,6 +367,16 @@ class _LineScreenState extends State<LineScreen> {
           subtitle: Text(words.endIt),
           onTap: () => _then(_end(line)),
         ),
+        // A new key at each reload: read again after a change.
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: TraceText(
+            key: ObjectKey(line),
+            app: _app,
+            budget: widget.budget,
+            item: widget.line,
+          ),
+        ),
       ],
     );
   }

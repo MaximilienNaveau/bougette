@@ -955,6 +955,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Year by category'**
   String get byCategory;
+
+  /// No description provided for @addedBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Added: {who}, {when}'**
+  String addedBy(String who, String when);
+
+  /// No description provided for @changedBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Last changed: {who}, {when}'**
+  String changedBy(String who, String when);
 }
 
 class _AppLocalizationsDelegate

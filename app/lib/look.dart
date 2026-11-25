@@ -34,6 +34,11 @@ String monthTitle(String month, {bool withYear = true}) {
 /// A date (`2026-11-05`) as the language writes it: `5 nov. 2026`.
 String dateText(String date) => DateFormat.yMMMd().format(DateTime.parse(date));
 
+/// A time (`2026-11-24T14:05`) as the language writes it: `24 nov. 2026
+/// 14:05`.
+String timeText(String time) =>
+    DateFormat.yMMMd().add_Hm().format(DateTime.parse(time));
+
 /// How a line repeats, in words.
 String repeatLabel(BuildContext context, Repeat repeat) => switch (repeat) {
   Repeat.monthly => context.words.repeatMonthly,

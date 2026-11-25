@@ -298,5 +298,28 @@
     }
   },
   "yearForecastHint": "Planned: the whole year's plan. Actual: what happened so far. Forecast: the actual of the past months and the plan of the coming ones, the expected total at the end of the year. Costs are negative; money paid from a pot isn't counted, its allocations are.",
-  "byCategory": "Year by category"
+  "byCategory": "Year by category",
+  "you": "you",
+  "addedBy": "Added: {who}, {when}",
+  "@addedBy": {
+    "placeholders": {
+      "who": {
+        "type": "String"
+      },
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "changedBy": "Last changed: {who}, {when}",
+  "@changedBy": {
+    "placeholders": {
+      "who": {
+        "type": "String"
+      },
+      "when": {
+        "type": "String"
+      }
+    }
+  }
 }

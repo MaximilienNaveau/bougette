@@ -65,6 +65,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ServerInfo dco_decode_box_autoadd_server_info(dynamic raw);
 
   @protected
+  Stamp dco_decode_box_autoadd_stamp(dynamic raw);
+
+  @protected
   BudgetChoice dco_decode_budget_choice(dynamic raw);
 
   @protected
@@ -155,6 +158,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ServerInfo? dco_decode_opt_box_autoadd_server_info(dynamic raw);
 
   @protected
+  Stamp? dco_decode_opt_box_autoadd_stamp(dynamic raw);
+
+  @protected
   PotRow dco_decode_pot_row(dynamic raw);
 
   @protected
@@ -170,6 +176,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Source dco_decode_source(dynamic raw);
 
   @protected
+  Stamp dco_decode_stamp(dynamic raw);
+
+  @protected
   Status dco_decode_status(dynamic raw);
 
   @protected
@@ -177,6 +186,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Totals dco_decode_totals(dynamic raw);
+
+  @protected
+  Trace dco_decode_trace(dynamic raw);
 
   @protected
   TransactionRow dco_decode_transaction_row(dynamic raw);
@@ -239,6 +251,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ServerInfo sse_decode_box_autoadd_server_info(SseDeserializer deserializer);
+
+  @protected
+  Stamp sse_decode_box_autoadd_stamp(SseDeserializer deserializer);
 
   @protected
   BudgetChoice sse_decode_budget_choice(SseDeserializer deserializer);
@@ -343,6 +358,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  Stamp? sse_decode_opt_box_autoadd_stamp(SseDeserializer deserializer);
+
+  @protected
   PotRow sse_decode_pot_row(SseDeserializer deserializer);
 
   @protected
@@ -358,6 +376,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Source sse_decode_source(SseDeserializer deserializer);
 
   @protected
+  Stamp sse_decode_stamp(SseDeserializer deserializer);
+
+  @protected
   Status sse_decode_status(SseDeserializer deserializer);
 
   @protected
@@ -365,6 +386,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Totals sse_decode_totals(SseDeserializer deserializer);
+
+  @protected
+  Trace sse_decode_trace(SseDeserializer deserializer);
 
   @protected
   TransactionRow sse_decode_transaction_row(SseDeserializer deserializer);
@@ -440,6 +464,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     ServerInfo self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_box_autoadd_stamp(Stamp self, SseSerializer serializer);
 
   @protected
   void sse_encode_budget_choice(BudgetChoice self, SseSerializer serializer);
@@ -571,6 +598,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_stamp(Stamp? self, SseSerializer serializer);
+
+  @protected
   void sse_encode_pot_row(PotRow self, SseSerializer serializer);
 
   @protected
@@ -586,6 +616,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_source(Source self, SseSerializer serializer);
 
   @protected
+  void sse_encode_stamp(Stamp self, SseSerializer serializer);
+
+  @protected
   void sse_encode_status(Status self, SseSerializer serializer);
 
   @protected
@@ -593,6 +626,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_totals(Totals self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_trace(Trace self, SseSerializer serializer);
 
   @protected
   void sse_encode_transaction_row(

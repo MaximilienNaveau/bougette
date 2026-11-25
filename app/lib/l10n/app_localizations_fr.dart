@@ -489,4 +489,14 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get byCategory => 'L\'année par catégorie';
+
+  @override
+  String addedBy(String who, String when) {
+    return 'Ajout : $who, $when';
+  }
+
+  @override
+  String changedBy(String who, String when) {
+    return 'Dernière modification : $who, $when';
+  }
 }

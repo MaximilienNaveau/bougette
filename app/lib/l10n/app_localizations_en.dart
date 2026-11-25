@@ -488,4 +488,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get byCategory => 'Year by category';
+
+  @override
+  String addedBy(String who, String when) {
+    return 'Added: $who, $when';
+  }
+
+  @override
+  String changedBy(String who, String when) {
+    return 'Last changed: $who, $when';
+  }
 }
