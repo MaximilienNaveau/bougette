@@ -214,27 +214,33 @@ class _BudgetScreenState extends State<BudgetScreen> {
               ),
             ],
           ),
-          floatingActionButton: view == null
+          // The add buttons in a bar of their own under the month, not
+          // floating over it: they would hide its last figures.
+          bottomNavigationBar: view == null
               ? null
-              : Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    FloatingActionButton.small(
-                      heroTag: 'line',
-                      tooltip: context.words.addLine,
-                      onPressed: () =>
-                          _then(addLine(context, app, _budget, view)),
-                      child: const Icon(Icons.playlist_add),
+              : SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () =>
+                              _then(addLine(context, app, _budget, view)),
+                          icon: const Icon(Icons.playlist_add),
+                          label: Text(context.words.addLine),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton.icon(
+                          onPressed: () => _then(
+                            addTransaction(context, app, _budget, view),
+                          ),
+                          icon: const Icon(Icons.add),
+                          label: Text(context.words.transactionButton),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    FloatingActionButton.extended(
-                      heroTag: 'transaction',
-                      onPressed: () =>
-                          _then(addTransaction(context, app, _budget, view)),
-                      icon: const Icon(Icons.add),
-                      label: Text(context.words.transactionButton),
-                    ),
-                  ],
+                  ),
                 ),
           body: Column(
             children: [

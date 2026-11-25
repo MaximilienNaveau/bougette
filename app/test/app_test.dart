@@ -291,7 +291,7 @@ void main() {
     // From the personal budget, 100 a month to the flat's budget.
     await tapSoon(tester, find.text('Maison'));
     await settle(tester);
-    await tapSoon(tester, find.byTooltip('Add a line'));
+    await tapSoon(tester, find.text('Add a line'));
     await settle(tester);
     await tester.enterText(find.widgetWithText(TextField, 'Name'), 'Appart');
     await tester.enterText(

@@ -31,7 +31,7 @@ class MonthBody extends StatelessWidget {
     DataCell cell(int cents, [Status status = Status.none]) =>
         DataCell(Amount(cents, currency, status: status));
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       children: [
         Text(
           context.words.linesHeading(sourceLabel(context, view.source)),
