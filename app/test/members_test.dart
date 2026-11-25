@@ -115,5 +115,33 @@ void main() {
     await tapSoon(tester, find.text('OK'));
     await settle(tester);
     await expectSoon(tester, find.textContaining('$address#'), findsOneWidget);
+    final invitation = tester
+        .widget<SelectableText>(find.byType(SelectableText))
+        .data!;
+    await tapSoon(tester, find.text('Close'));
+    await settle(tester);
+
+    // Bob accepts it on his device: Alice's device lets him in at its
+    // next sync, which notifies her.
+    await tester.runAsync(() async {
+      final bob = await App.open(path: '${folder.path}/bob.sqlite');
+      await bob.setName(name: 'Bob');
+      await bob.accept(invitation: invitation, username: 'bob');
+      await app.syncNow(); // Alice's device grants the request
+      await bob.syncNow(); // Bob gets the keys and writes his name
+      await app.syncNow(); // Alice gets his name
+    });
+    await tester.pageBack();
+    await settle(tester);
+    await tester.pageBack();
+    await settle(tester);
+    // The bell's counter, then the notification, read once opened.
+    await expectSoon(tester, find.text('1'), findsOneWidget);
+    await tapSoon(tester, find.byTooltip('Notifications'));
+    await settle(tester);
+    await expectSoon(tester, find.text('Bob joined Maison'), findsOneWidget);
+    await tester.pageBack();
+    await settle(tester);
+    await expectSoon(tester, find.text('1'), findsNothing);
   }, skip: server == null);
 }

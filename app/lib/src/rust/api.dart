@@ -145,6 +145,9 @@ abstract class App implements RustOpaqueInterface {
   /// Makes this new device one of the member's, with a device code.
   Future<void> linkDevice({required String code});
 
+  /// Marks every notification read, once they've been shown.
+  Future<void> markNotificationsRead();
+
   /// The members of `budget`, Admins first.
   Future<List<MemberRow>> members({required String budget});
 
@@ -156,6 +159,9 @@ abstract class App implements RustOpaqueInterface {
 
   /// How this member appears to the others, if set.
   Future<String?> name();
+
+  /// The notifications, latest first.
+  Future<List<NoticeRow>> notifications();
 
   /// Opens (or creates) the database at `path`.
   static Future<App> open({required String path}) =>
@@ -273,6 +279,9 @@ abstract class App implements RustOpaqueInterface {
   /// What was deleted from `budget` in the last 30 days, the latest
   /// first (doc/scope.md: Corbeille).
   Future<List<TrashRow>> trash({required String budget});
+
+  /// How many notifications are not read yet: the bell's counter.
+  Future<int> unreadNotifications();
 
   /// The whole of `year` for budget `budget`, by category.
   Future<YearView> year({required String budget, required int year});

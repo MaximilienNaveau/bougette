@@ -8,7 +8,7 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `budget_id`, `member_role`, `online`, `store_role`, `summary`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// What a member may do in a budget (GLOSSARY.md: Role).
 enum MemberRole { admin, editor, reader }
@@ -43,6 +43,92 @@ class MemberRow {
           name == other.name &&
           role == other.role &&
           me == other.me;
+}
+
+/// What a notification is about (doc/scope.md: Notifications internes).
+enum NoticeKind {
+  /// An amount this member wrote was overwritten by `who`.
+  amountChanged,
+
+  /// `who` joined the budget.
+  joined,
+
+  /// `who` left the budget, or was removed from it.
+  left,
+
+  /// This member's role is now `role`.
+  roleChanged,
+
+  /// This member was removed from the budget.
+  removed,
+}
+
+/// A notification as the app shows it.
+class NoticeRow {
+  final NoticeKind kind;
+
+  /// The budget's name, empty if this device can no longer read it.
+  final String budget;
+  final String currency;
+
+  /// `2026-11-24T14:05`, where the user is.
+  final String time;
+
+  /// The member it is about: their name, or the start of their
+  /// identifier. Empty for a role change or a removal.
+  final String who;
+
+  /// For a changed amount: the line's name, or the transaction's
+  /// category and date; the amount before and after, in cents.
+  final String subject;
+  final PlatformInt64 before;
+  final PlatformInt64 after;
+
+  /// For a role change, the new role.
+  final MemberRole? role;
+  final bool read;
+
+  const NoticeRow({
+    required this.kind,
+    required this.budget,
+    required this.currency,
+    required this.time,
+    required this.who,
+    required this.subject,
+    required this.before,
+    required this.after,
+    this.role,
+    required this.read,
+  });
+
+  @override
+  int get hashCode =>
+      kind.hashCode ^
+      budget.hashCode ^
+      currency.hashCode ^
+      time.hashCode ^
+      who.hashCode ^
+      subject.hashCode ^
+      before.hashCode ^
+      after.hashCode ^
+      role.hashCode ^
+      read.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NoticeRow &&
+          runtimeType == other.runtimeType &&
+          kind == other.kind &&
+          budget == other.budget &&
+          currency == other.currency &&
+          time == other.time &&
+          who == other.who &&
+          subject == other.subject &&
+          before == other.before &&
+          after == other.after &&
+          role == other.role &&
+          read == other.read;
 }
 
 /// The server this device joined.

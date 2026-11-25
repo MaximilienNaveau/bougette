@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'budget.dart';
 import 'forms.dart';
 import 'look.dart';
+import 'notices.dart';
 import 'settings.dart';
 import 'src/rust/api.dart';
 import 'src/rust/api/members.dart';
@@ -27,6 +28,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   // `late`: set before first use (in `initState`), not at construction.
   late Future<List<BudgetSummary>> _budgets;
+  // The bell's counter: notifications not read yet.
+  int _unread = 0;
 
   @override
   void initState() {
@@ -41,6 +44,20 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _budgets = widget.app.budgets();
     });
+    _countUnread();
+  }
+
+  Future<void> _countUnread() async {
+    final unread = await widget.app.unreadNotifications();
+    if (mounted) setState(() => _unread = unread);
+  }
+
+  /// The notifications; opening them marks them read.
+  Future<void> _notices() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => NoticesScreen(app: widget.app)));
+    _reload();
   }
 
   /// Syncs with the server, and says what came and went.
@@ -98,6 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text(context.words.myBudgets),
         actions: [
+          bell(context, _unread, _notices),
           IconButton(
             onPressed: _export,
             icon: const Icon(Icons.download),

@@ -113,6 +113,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<MonthCell> dco_decode_list_month_cell(dynamic raw);
 
   @protected
+  List<NoticeRow> dco_decode_list_notice_row(dynamic raw);
+
+  @protected
   List<PotRow> dco_decode_list_pot_row(dynamic raw);
 
   @protected
@@ -138,6 +141,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   MonthView dco_decode_month_view(dynamic raw);
+
+  @protected
+  NoticeKind dco_decode_notice_kind(dynamic raw);
+
+  @protected
+  NoticeRow dco_decode_notice_row(dynamic raw);
 
   @protected
   String? dco_decode_opt_String(dynamic raw);
@@ -305,6 +314,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<MonthCell> sse_decode_list_month_cell(SseDeserializer deserializer);
 
   @protected
+  List<NoticeRow> sse_decode_list_notice_row(SseDeserializer deserializer);
+
+  @protected
   List<PotRow> sse_decode_list_pot_row(SseDeserializer deserializer);
 
   @protected
@@ -332,6 +344,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   MonthView sse_decode_month_view(SseDeserializer deserializer);
+
+  @protected
+  NoticeKind sse_decode_notice_kind(SseDeserializer deserializer);
+
+  @protected
+  NoticeRow sse_decode_notice_row(SseDeserializer deserializer);
 
   @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
@@ -529,6 +547,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_notice_row(
+    List<NoticeRow> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_pot_row(List<PotRow> self, SseSerializer serializer);
 
   @protected
@@ -563,6 +587,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_month_view(MonthView self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_notice_kind(NoticeKind self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_notice_row(NoticeRow self, SseSerializer serializer);
 
   @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);

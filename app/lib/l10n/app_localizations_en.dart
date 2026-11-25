@@ -498,4 +498,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String changedBy(String who, String when) {
     return 'Last changed: $who, $when';
   }
+
+  @override
+  String get notifications => 'Notifications';
+
+  @override
+  String get noNotifications => 'Nothing new.';
+
+  @override
+  String get aBudget => 'a budget';
+
+  @override
+  String noticeAmount(
+    String who,
+    String subject,
+    String budget,
+    String before,
+    String after,
+  ) {
+    return '$who changed $subject in $budget: $before → $after';
+  }
+
+  @override
+  String noticeJoined(String who, String budget) {
+    return '$who joined $budget';
+  }
+
+  @override
+  String noticeLeft(String who, String budget) {
+    return '$who left $budget';
+  }
+
+  @override
+  String noticeRole(String budget, String role) {
+    return 'Your role in $budget is now $role';
+  }
+
+  @override
+  String noticeRemoved(String budget) {
+    return 'You are no longer a member of $budget';
+  }
 }

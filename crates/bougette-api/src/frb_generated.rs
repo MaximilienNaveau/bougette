@@ -40,7 +40,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1014714540;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1002072220;
 
 // Section: executor
 
@@ -1099,6 +1099,55 @@ fn wire__crate__api__App_link_device_impl(
         },
     )
 }
+fn wire__crate__api__App_mark_notifications_read_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "App_mark_notifications_read",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<App>,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let mut api_that_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_that, 0, false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_that_guard = api_that_guard.unwrap();
+                    let output_ok = crate::api::App::mark_notifications_read(&*api_that_guard)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__App_members_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -1294,6 +1343,55 @@ fn wire__crate__api__App_name_impl(
                     }
                     let api_that_guard = api_that_guard.unwrap();
                     let output_ok = crate::api::App::name(&*api_that_guard)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__App_notifications_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "App_notifications",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<App>,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let mut api_that_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_that, 0, false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_that_guard = api_that_guard.unwrap();
+                    let output_ok = crate::api::App::notifications(&*api_that_guard)?;
                     std::result::Result::Ok(output_ok)
                 })())
             }
@@ -2303,6 +2401,55 @@ fn wire__crate__api__App_trash_impl(
         },
     )
 }
+fn wire__crate__api__App_unread_notifications_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "App_unread_notifications",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<App>,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let mut api_that_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_that, 0, false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_that_guard = api_that_guard.unwrap();
+                    let output_ok = crate::api::App::unread_notifications(&*api_that_guard)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__App_year_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -2607,6 +2754,18 @@ impl SseDecode for Vec<crate::api::MonthCell> {
     }
 }
 
+impl SseDecode for Vec<crate::api::members::NoticeRow> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::members::NoticeRow>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<crate::api::PotRow> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -2750,6 +2909,49 @@ impl SseDecode for crate::api::MonthView {
             pots: var_pots,
             destinations: var_destinations,
             first_year: var_firstYear,
+        };
+    }
+}
+
+impl SseDecode for crate::api::members::NoticeKind {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::members::NoticeKind::AmountChanged,
+            1 => crate::api::members::NoticeKind::Joined,
+            2 => crate::api::members::NoticeKind::Left,
+            3 => crate::api::members::NoticeKind::RoleChanged,
+            4 => crate::api::members::NoticeKind::Removed,
+            _ => unreachable!("Invalid variant for NoticeKind: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::members::NoticeRow {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_kind = <crate::api::members::NoticeKind>::sse_decode(deserializer);
+        let mut var_budget = <String>::sse_decode(deserializer);
+        let mut var_currency = <String>::sse_decode(deserializer);
+        let mut var_time = <String>::sse_decode(deserializer);
+        let mut var_who = <String>::sse_decode(deserializer);
+        let mut var_subject = <String>::sse_decode(deserializer);
+        let mut var_before = <i64>::sse_decode(deserializer);
+        let mut var_after = <i64>::sse_decode(deserializer);
+        let mut var_role = <Option<crate::api::members::MemberRole>>::sse_decode(deserializer);
+        let mut var_read = <bool>::sse_decode(deserializer);
+        return crate::api::members::NoticeRow {
+            kind: var_kind,
+            budget: var_budget,
+            currency: var_currency,
+            time: var_time,
+            who: var_who,
+            subject: var_subject,
+            before: var_before,
+            after: var_after,
+            role: var_role,
+            read: var_read,
         };
     }
 }
@@ -3093,30 +3295,33 @@ fn pde_ffi_dispatcher_primary_impl(
         17 => wire__crate__api__App_leave_impl(port, ptr, rust_vec_len, data_len),
         18 => wire__crate__api__App_line_detail_impl(port, ptr, rust_vec_len, data_len),
         19 => wire__crate__api__App_link_device_impl(port, ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__App_members_impl(port, ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__App_month_impl(port, ptr, rust_vec_len, data_len),
-        22 => wire__crate__api__App_my_role_impl(port, ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__App_name_impl(port, ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__App_open_impl(port, ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__App_recover_impl(port, ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__App_redirect_line_impl(port, ptr, rust_vec_len, data_len),
-        27 => wire__crate__api__App_remove_line_impl(port, ptr, rust_vec_len, data_len),
-        28 => wire__crate__api__App_remove_member_impl(port, ptr, rust_vec_len, data_len),
-        29 => wire__crate__api__App_remove_revision_impl(port, ptr, rust_vec_len, data_len),
-        30 => wire__crate__api__App_remove_transaction_impl(port, ptr, rust_vec_len, data_len),
-        31 => wire__crate__api__App_rename_budget_impl(port, ptr, rust_vec_len, data_len),
-        32 => wire__crate__api__App_rename_line_impl(port, ptr, rust_vec_len, data_len),
-        33 => wire__crate__api__App_restore_impl(port, ptr, rust_vec_len, data_len),
-        34 => wire__crate__api__App_server_impl(port, ptr, rust_vec_len, data_len),
-        35 => wire__crate__api__App_set_name_impl(port, ptr, rust_vec_len, data_len),
-        36 => wire__crate__api__App_set_personal_impl(port, ptr, rust_vec_len, data_len),
-        37 => wire__crate__api__App_set_revision_impl(port, ptr, rust_vec_len, data_len),
-        38 => wire__crate__api__App_set_role_impl(port, ptr, rust_vec_len, data_len),
-        39 => wire__crate__api__App_set_up_recovery_impl(port, ptr, rust_vec_len, data_len),
-        40 => wire__crate__api__App_sync_now_impl(port, ptr, rust_vec_len, data_len),
-        41 => wire__crate__api__App_trace_impl(port, ptr, rust_vec_len, data_len),
-        42 => wire__crate__api__App_trash_impl(port, ptr, rust_vec_len, data_len),
-        43 => wire__crate__api__App_year_impl(port, ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__App_mark_notifications_read_impl(port, ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__App_members_impl(port, ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__App_month_impl(port, ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__App_my_role_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__App_name_impl(port, ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__App_notifications_impl(port, ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__App_open_impl(port, ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__App_recover_impl(port, ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__App_redirect_line_impl(port, ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__App_remove_line_impl(port, ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__App_remove_member_impl(port, ptr, rust_vec_len, data_len),
+        31 => wire__crate__api__App_remove_revision_impl(port, ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__App_remove_transaction_impl(port, ptr, rust_vec_len, data_len),
+        33 => wire__crate__api__App_rename_budget_impl(port, ptr, rust_vec_len, data_len),
+        34 => wire__crate__api__App_rename_line_impl(port, ptr, rust_vec_len, data_len),
+        35 => wire__crate__api__App_restore_impl(port, ptr, rust_vec_len, data_len),
+        36 => wire__crate__api__App_server_impl(port, ptr, rust_vec_len, data_len),
+        37 => wire__crate__api__App_set_name_impl(port, ptr, rust_vec_len, data_len),
+        38 => wire__crate__api__App_set_personal_impl(port, ptr, rust_vec_len, data_len),
+        39 => wire__crate__api__App_set_revision_impl(port, ptr, rust_vec_len, data_len),
+        40 => wire__crate__api__App_set_role_impl(port, ptr, rust_vec_len, data_len),
+        41 => wire__crate__api__App_set_up_recovery_impl(port, ptr, rust_vec_len, data_len),
+        42 => wire__crate__api__App_sync_now_impl(port, ptr, rust_vec_len, data_len),
+        43 => wire__crate__api__App_trace_impl(port, ptr, rust_vec_len, data_len),
+        44 => wire__crate__api__App_trash_impl(port, ptr, rust_vec_len, data_len),
+        45 => wire__crate__api__App_unread_notifications_impl(port, ptr, rust_vec_len, data_len),
+        46 => wire__crate__api__App_year_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -3345,6 +3550,59 @@ impl flutter_rust_bridge::IntoDart for crate::api::MonthView {
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::MonthView {}
 impl flutter_rust_bridge::IntoIntoDart<crate::api::MonthView> for crate::api::MonthView {
     fn into_into_dart(self) -> crate::api::MonthView {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::members::NoticeKind {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::AmountChanged => 0.into_dart(),
+            Self::Joined => 1.into_dart(),
+            Self::Left => 2.into_dart(),
+            Self::RoleChanged => 3.into_dart(),
+            Self::Removed => 4.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::members::NoticeKind
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::members::NoticeKind>
+    for crate::api::members::NoticeKind
+{
+    fn into_into_dart(self) -> crate::api::members::NoticeKind {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::members::NoticeRow {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.kind.into_into_dart().into_dart(),
+            self.budget.into_into_dart().into_dart(),
+            self.currency.into_into_dart().into_dart(),
+            self.time.into_into_dart().into_dart(),
+            self.who.into_into_dart().into_dart(),
+            self.subject.into_into_dart().into_dart(),
+            self.before.into_into_dart().into_dart(),
+            self.after.into_into_dart().into_dart(),
+            self.role.into_into_dart().into_dart(),
+            self.read.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::members::NoticeRow
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::members::NoticeRow>
+    for crate::api::members::NoticeRow
+{
+    fn into_into_dart(self) -> crate::api::members::NoticeRow {
         self
     }
 }
@@ -3784,6 +4042,16 @@ impl SseEncode for Vec<crate::api::MonthCell> {
     }
 }
 
+impl SseEncode for Vec<crate::api::members::NoticeRow> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::members::NoticeRow>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<crate::api::PotRow> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -3891,6 +4159,41 @@ impl SseEncode for crate::api::MonthView {
         <Vec<crate::api::PotRow>>::sse_encode(self.pots, serializer);
         <Vec<crate::api::BudgetChoice>>::sse_encode(self.destinations, serializer);
         <i16>::sse_encode(self.first_year, serializer);
+    }
+}
+
+impl SseEncode for crate::api::members::NoticeKind {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::members::NoticeKind::AmountChanged => 0,
+                crate::api::members::NoticeKind::Joined => 1,
+                crate::api::members::NoticeKind::Left => 2,
+                crate::api::members::NoticeKind::RoleChanged => 3,
+                crate::api::members::NoticeKind::Removed => 4,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::api::members::NoticeRow {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <crate::api::members::NoticeKind>::sse_encode(self.kind, serializer);
+        <String>::sse_encode(self.budget, serializer);
+        <String>::sse_encode(self.currency, serializer);
+        <String>::sse_encode(self.time, serializer);
+        <String>::sse_encode(self.who, serializer);
+        <String>::sse_encode(self.subject, serializer);
+        <i64>::sse_encode(self.before, serializer);
+        <i64>::sse_encode(self.after, serializer);
+        <Option<crate::api::members::MemberRole>>::sse_encode(self.role, serializer);
+        <bool>::sse_encode(self.read, serializer);
     }
 }
 

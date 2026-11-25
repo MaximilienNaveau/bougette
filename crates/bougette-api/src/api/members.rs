@@ -2,12 +2,14 @@
 //! the command-line client (`bougette_sync::client`), worded by the app.
 
 use bougette_core::id::BudgetId;
-use bougette_store::Role;
+use std::collections::HashMap;
+
 use bougette_store::crypto::RECOVERY_COST;
+use bougette_store::{Event, Role};
 use bougette_sync::Summary;
 use bougette_sync::client::Client;
 
-use super::{App, stored};
+use super::{App, local_time, stored};
 
 /// The server this device joined.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -42,7 +44,107 @@ pub struct MemberRow {
     pub me: bool,
 }
 
+/// What a notification is about (doc/scope.md: Notifications internes).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NoticeKind {
+    /// An amount this member wrote was overwritten by `who`.
+    AmountChanged,
+    /// `who` joined the budget.
+    Joined,
+    /// `who` left the budget, or was removed from it.
+    Left,
+    /// This member's role is now `role`.
+    RoleChanged,
+    /// This member was removed from the budget.
+    Removed,
+}
+
+/// A notification as the app shows it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NoticeRow {
+    pub kind: NoticeKind,
+    /// The budget's name, empty if this device can no longer read it.
+    pub budget: String,
+    pub currency: String,
+    /// `2026-11-24T14:05`, where the user is.
+    pub time: String,
+    /// The member it is about: their name, or the start of their
+    /// identifier. Empty for a role change or a removal.
+    pub who: String,
+    /// For a changed amount: the line's name, or the transaction's
+    /// category and date; the amount before and after, in cents.
+    pub subject: String,
+    pub before: i64,
+    pub after: i64,
+    /// For a role change, the new role.
+    pub role: Option<MemberRole>,
+    pub read: bool,
+}
+
 impl App {
+    /// The notifications, latest first.
+    pub fn notifications(&self) -> Result<Vec<NoticeRow>, String> {
+        let store = self.lock();
+        let notifications = store.notifications().map_err(stored)?;
+        // Each budget's name and currency, looked up once.
+        let mut budgets: HashMap<String, (String, String)> = HashMap::new();
+        let mut rows = Vec::new();
+        for notification in notifications {
+            if !budgets.contains_key(&notification.budget) {
+                let found = match notification.budget.parse() {
+                    Ok(id) => store.load(BudgetId(id)).map_err(stored)?,
+                    Err(_) => None,
+                };
+                let (name, currency) = found.map_or((String::new(), "EUR".to_string()), |b| {
+                    (b.name.clone(), b.currency().code().to_string())
+                });
+                budgets.insert(notification.budget.clone(), (name, currency));
+            }
+            let (budget, currency) = budgets[&notification.budget].clone();
+            let (kind, subject, before, after, role) = match notification.event {
+                Event::AmountChanged {
+                    subject,
+                    before,
+                    after,
+                } => (NoticeKind::AmountChanged, subject, before, after, None),
+                Event::Joined => (NoticeKind::Joined, String::new(), 0, 0, None),
+                Event::Left => (NoticeKind::Left, String::new(), 0, 0, None),
+                Event::RoleChanged(role) => (
+                    NoticeKind::RoleChanged,
+                    String::new(),
+                    0,
+                    0,
+                    Some(member_role(role)),
+                ),
+                Event::Removed => (NoticeKind::Removed, String::new(), 0, 0, None),
+            };
+            rows.push(NoticeRow {
+                kind,
+                budget,
+                currency,
+                time: local_time(notification.millis),
+                who: notification.who,
+                subject,
+                before,
+                after,
+                role,
+                read: notification.read,
+            });
+        }
+        Ok(rows)
+    }
+
+    /// How many notifications are not read yet: the bell's counter.
+    pub fn unread_notifications(&self) -> Result<u32, String> {
+        let count = self.lock().unread().map_err(stored)?;
+        Ok(u32::try_from(count).unwrap_or(u32::MAX))
+    }
+
+    /// Marks every notification read, once they've been shown.
+    pub fn mark_notifications_read(&self) -> Result<(), String> {
+        self.lock().mark_read().map_err(stored)
+    }
+
     /// The server this device joined, if any.
     pub fn server(&self) -> Result<Option<ServerInfo>, String> {
         let store = self.lock();

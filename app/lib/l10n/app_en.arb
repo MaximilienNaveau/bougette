@@ -321,5 +321,69 @@
         "type": "String"
       }
     }
+  },
+  "notifications": "Notifications",
+  "noNotifications": "Nothing new.",
+  "aBudget": "a budget",
+  "noticeAmount": "{who} changed {subject} in {budget}: {before} → {after}",
+  "@noticeAmount": {
+    "placeholders": {
+      "who": {
+        "type": "String"
+      },
+      "subject": {
+        "type": "String"
+      },
+      "budget": {
+        "type": "String"
+      },
+      "before": {
+        "type": "String"
+      },
+      "after": {
+        "type": "String"
+      }
+    }
+  },
+  "noticeJoined": "{who} joined {budget}",
+  "@noticeJoined": {
+    "placeholders": {
+      "who": {
+        "type": "String"
+      },
+      "budget": {
+        "type": "String"
+      }
+    }
+  },
+  "noticeLeft": "{who} left {budget}",
+  "@noticeLeft": {
+    "placeholders": {
+      "who": {
+        "type": "String"
+      },
+      "budget": {
+        "type": "String"
+      }
+    }
+  },
+  "noticeRole": "Your role in {budget} is now {role}",
+  "@noticeRole": {
+    "placeholders": {
+      "budget": {
+        "type": "String"
+      },
+      "role": {
+        "type": "String"
+      }
+    }
+  },
+  "noticeRemoved": "You are no longer a member of {budget}",
+  "@noticeRemoved": {
+    "placeholders": {
+      "budget": {
+        "type": "String"
+      }
+    }
   }
 }

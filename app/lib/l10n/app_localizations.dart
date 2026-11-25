@@ -967,6 +967,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Last changed: {who}, {when}'**
   String changedBy(String who, String when);
+
+  /// No description provided for @notifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get notifications;
+
+  /// No description provided for @noNotifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing new.'**
+  String get noNotifications;
+
+  /// No description provided for @aBudget.
+  ///
+  /// In en, this message translates to:
+  /// **'a budget'**
+  String get aBudget;
+
+  /// No description provided for @noticeAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'{who} changed {subject} in {budget}: {before} → {after}'**
+  String noticeAmount(
+    String who,
+    String subject,
+    String budget,
+    String before,
+    String after,
+  );
+
+  /// No description provided for @noticeJoined.
+  ///
+  /// In en, this message translates to:
+  /// **'{who} joined {budget}'**
+  String noticeJoined(String who, String budget);
+
+  /// No description provided for @noticeLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'{who} left {budget}'**
+  String noticeLeft(String who, String budget);
+
+  /// No description provided for @noticeRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Your role in {budget} is now {role}'**
+  String noticeRole(String budget, String role);
+
+  /// No description provided for @noticeRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'You are no longer a member of {budget}'**
+  String noticeRemoved(String budget);
 }
 
 class _AppLocalizationsDelegate

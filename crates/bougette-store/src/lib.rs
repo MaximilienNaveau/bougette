@@ -31,6 +31,7 @@ mod codec;
 pub mod crypto;
 mod members;
 mod message;
+mod notify;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
@@ -49,6 +50,7 @@ use crate::codec::{DELETED, Records};
 use crate::crypto::Identity;
 pub use crate::members::{Invitation, MemberInfo};
 pub use crate::message::{Body, Change, Message};
+pub use crate::notify::{Event, Notification};
 
 /// Why a storage operation failed.
 #[derive(Debug)]
@@ -151,6 +153,19 @@ const SCHEMA: &str = "
         role TEXT NOT NULL,
         expires INTEGER NOT NULL,
         used INTEGER NOT NULL DEFAULT 0
+    );
+    -- Added within version 3: `IF NOT EXISTS` adds it to older files.
+    CREATE TABLE IF NOT EXISTS notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        budget TEXT NOT NULL,
+        millis INTEGER NOT NULL,
+        who TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        old INTEGER NOT NULL,
+        new INTEGER NOT NULL,
+        role TEXT NOT NULL,
+        read INTEGER NOT NULL DEFAULT 0
     );
     PRAGMA user_version = 3;
 ";
@@ -656,6 +671,15 @@ impl Store {
                 return Err(Corrupt(format!("invalid message {:?}", message.timestamp)).into());
             }
         }
+        // A `BTreeSet` of the budgets concerned: each once, in order.
+        let budgets: BTreeSet<&str> = messages.iter().map(|m| m.budget.as_str()).collect();
+        // Each budget as it was, to notice what changes (see `notify`).
+        let mut before = Vec::new();
+        if self.replays {
+            for budget in &budgets {
+                before.push((*budget, self.before(budget)?));
+            }
+        }
         let transaction = self.connection.transaction()?;
         let mut new = 0;
         for message in messages {
@@ -668,11 +692,14 @@ impl Store {
         for message in messages {
             self.clock.observe(&message.timestamp);
         }
-        // A `BTreeSet` of the budgets concerned: each once, in order.
-        let budgets: BTreeSet<&str> = messages.iter().map(|m| m.budget.as_str()).collect();
-        for budget in budgets {
+        for budget in &budgets {
             self.rebuild(budget)?;
             self.follow_up(budget)?;
+        }
+        // After the follow-ups: a join request this device granted is a
+        // member joining.
+        for (budget, before) in before {
+            self.notice(budget, before)?;
         }
         Ok(new)
     }

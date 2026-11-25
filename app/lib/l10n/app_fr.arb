@@ -145,5 +145,13 @@
   "byCategory": "L'année par catégorie",
   "you": "vous",
   "addedBy": "Ajout : {who}, {when}",
-  "changedBy": "Dernière modification : {who}, {when}"
+  "changedBy": "Dernière modification : {who}, {when}",
+  "notifications": "Notifications",
+  "noNotifications": "Rien de nouveau.",
+  "aBudget": "un budget",
+  "noticeAmount": "{who} a changé {subject} dans {budget} : {before} → {after}",
+  "noticeJoined": "{who} a rejoint {budget}",
+  "noticeLeft": "{who} a quitté {budget}",
+  "noticeRole": "Votre rôle dans {budget} est maintenant {role}",
+  "noticeRemoved": "Vous ne faites plus partie de {budget}"
 }
